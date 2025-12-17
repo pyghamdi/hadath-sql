@@ -9,4 +9,4 @@ SELECT tfidf_build_model('sample_documents', 'content', 'my_tfidf_model', TRUE);
 SELECT tfidf_vectorize('The quick brown fox jumps over the lazy dog', 'my_tfidf_model');
 
 -- Test the tokenizer function
-SELECT * FROM unnest(tsvector_to_array(to_tsvector('english', 'The quick brown fox jumps over the lazy dog'))) AS term;
+SELECT * FROM unnest(to_tsvector('english', 'The quick brown fox jumps over the lazy dog')) AS term;
