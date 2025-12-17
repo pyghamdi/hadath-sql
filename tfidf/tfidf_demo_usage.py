@@ -74,7 +74,7 @@ def demo_usage(table_name: str,
     """
     print("=== TF-IDF Model Demo ===\n")
     
-    # Connect to PostgreSQL
+    connection = None
     try:
         print(f"Connecting to PostgreSQL database '{database}'...")
         connection = psycopg2.connect(
@@ -107,7 +107,6 @@ def demo_usage(table_name: str,
         
         if not rows:
             print(f"Warning: No documents found in table '{table_name}'")
-            connection.close()
             return
         
         print(f"Found {len(rows)} documents\n")
@@ -129,16 +128,16 @@ def demo_usage(table_name: str,
         for term, weight in tfidf_vector.items():
             print(f"Term: {term}, Weight: {weight}")
         
-        connection.close()
+        print(f"\nModel statistics: {tfidf.get_stats()}")
         
     except psycopg2.Error as e:
         print(f"Error connecting to PostgreSQL: {e}")
-        return
     except Exception as e:
         print(f"Error retrieving documents: {e}")
-        return
-    
-    print(f"\nModel statistics: {tfidf.get_stats()}")
+    finally:
+        # Ensure connection is always closed, even if an exception occurs
+        if connection is not None:
+            connection.close()
 
 if __name__ == "__main__":
     # Example usage: retrieve documents from PostgreSQL table
