@@ -54,8 +54,7 @@ def create_to_tsvector_tokenizer(db_connection):
 
 
 def demo_usage(table_name: str, 
-               id_column: str = 'document_id', 
-               text_column: str = 'text_content',
+               text_column: str = 'text',
                host: str = '127.0.0.1',
                port: str = '5432',
                database: str = 'hadathdb',
@@ -66,7 +65,7 @@ def demo_usage(table_name: str,
     
     Args:
         table_name: Name of the PostgreSQL table containing text content
-        text_column: Name of the column containing document text (default: 'text_content')
+        text_column: Name of the column containing document text (default: 'text')
         host: PostgreSQL host (default: '127.0.0.1')
         port: PostgreSQL port (default: '5432')
         database: Database name (default: 'hadathdb')
@@ -96,13 +95,9 @@ def demo_usage(table_name: str,
         query = sql.SQL("""
             SELECT {}
             FROM {}
-            WHERE {} IS NOT NULL
-            ORDER BY {}
         """).format(
             sql.Identifier(text_column),
             sql.Identifier(table_name),
-            sql.Identifier(text_column),
-            sql.Identifier(id_column)
         )
         
         print(f"Retrieving documents from table '{table_name}'...")
@@ -126,7 +121,13 @@ def demo_usage(table_name: str,
                 print(f"Processed: {text[:80]}{'...' if len(text) > 80 else ''}")
         
         text = 'The quick brown fox jumps over the lazy dog'
-        print(f"TF-IDF weight vector for '{text}': {tfidf.get_tfidf_weight_vector(text)}")
+        # print(f"TF-IDF weight vector for '{text}': {tfidf.get_tfidf_weight_vector(text)}")
+        tfidf.print_stats()
+        tfidf.print_document_frequency()
+        tfidf_vector = tfidf.get_tfidf_weight_vector(text)
+        print(f"TF-IDF weight vector for '{text}': {tfidf_vector}")
+        for term, weight in tfidf_vector.items():
+            print(f"Term: {term}, Weight: {weight}")
         
         connection.close()
         
@@ -142,5 +143,5 @@ def demo_usage(table_name: str,
 if __name__ == "__main__":
     # Example usage: retrieve documents from PostgreSQL table
     # Modify the table name and connection parameters as needed
-    demo_usage(table_name='sample_documents')
+    demo_usage(table_name='sample_documents', text_column='content')
 
