@@ -6,6 +6,11 @@ This file demonstrates how to use the incremental_cluster function
 SELECT
     cls_incremental_clustering('sample_documents', 'content', 'created_at', 'my_tfidf_model', 'test_clusters', 0.7, TRUE);
 
+SELECT
+    *
+FROM
+    test_clusters;
+
 -- Cosine distance between two vectors
 -- vector1: (word1, 0.5), (word2, 0.3)
 -- vector2: (word1, 0.4), (word3, 0.2)
