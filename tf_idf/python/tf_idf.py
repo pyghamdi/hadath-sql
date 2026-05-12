@@ -1,8 +1,6 @@
-from collections import defaultdict
-from typing import List, Dict, Union, Optional, Any, Callable
-import re
 import math
-from collections import Counter
+from collections import Counter, defaultdict
+from typing import Any, Callable, Dict, List, Union
 
 
 class TFIDF:
@@ -23,7 +21,7 @@ class TFIDF:
     - No document storage: Only maintains aggregate statistics, not individual documents
 
     **Attributes:**
-        number_of_documents_containing_term (defaultdict[int]): Maps each term to the number
+        document_frequency (defaultdict[int]): Maps each term to the number
             of documents that contain it (document frequency, df(t))
         total_documents (int): Total number of documents processed
         tokenizer (Callable[[str], List[str]]): The tokenizer function used to tokenize text
@@ -54,59 +52,73 @@ class TFIDF:
                 "tokenizer must be a callable function that takes a string and returns List[str]."
             )
 
-        self.number_of_documents_containing_term = defaultdict(int)
+        self.document_frequency = defaultdict(int)
         # Total number of documents processed
         self.total_documents = 0
         # Tokenizer function for text tokenization
         self.tokenizer = tokenizer
 
-    def tokenize(self, text: str) -> List[str]:
+    def tokenize(
+        self, text: str, output: str = "dict"
+    ) -> Union[Dict[str, int], List[tuple[str, int]]]:
         """
         Tokenize text using the provided tokenizer function.
 
         Args:
             text: The text to tokenize
+            output: Output format for term counts.
+                - "dict": returns {term: count}
+                - "list": returns [(term, count), ...]
 
         Returns:
-            List of tokenized terms
+            Term counts as either a dictionary or list of (term, count) pairs.
         """
         if not text:
-            return []
+            return {} if output == "dict" else []
 
-        # Use the provided tokenizer function
-        return self.tokenizer(text)
+        terms = self.tokenizer(text)
+        if isinstance(terms, dict):
+            term_counts = {str(term): int(count) for term, count in terms.items()}
+        elif (
+            isinstance(terms, list)
+            and terms
+            and isinstance(terms[0], tuple)
+            and len(terms[0]) == 2
+        ):
+            term_counts = {str(term): int(count) for term, count in terms}
+        else:
+            term_counts = dict(Counter(terms))
 
-    def process_document(self, text: str) -> None:
+        if output == "dict":
+            return term_counts
+        if output == "list":
+            return list(term_counts.items())
+
+        raise ValueError("output must be either 'dict' or 'list'.")
+
+    def insert(self, text: str) -> None:
         """
-        Process a document by tokenizing it and updating document frequency statistics.
+        Insert a document into the TF-IDF model.
 
-        This method:
-        1. Increments the total document count
-        2. Tokenizes the document using the provided tokenizer
-        3. Updates the document frequency for each term in the document
+        This method inserts a document into the TF-IDF model by:
+        1. Tokenizes the document using the provided tokenizer
+        2. Adds the terms to the document frequency dictionary
 
         Args:
-            text: The text content of the document to process
+            text: The text content of the document to insert
         """
         self.total_documents += 1
+        terms = self.tokenize(text, output="dict")
+        for term in terms:
+            self.document_frequency[term] += 1
 
-        terms = self.tokenize(text)
-        self.add_terms(terms)
-
-    def add_terms(self, terms: List[str]) -> None:
+    def get_df(self, term: str) -> int:
         """
-        Add terms to the document frequency dictionary.
-
-        For each unique term in the list, increments the count of documents containing that term.
-        This method is typically called internally by process_document() after tokenization.
-        Note: Each term is counted only once per document, regardless of how many times it appears.
-
-        Args:
-            terms: A list of term strings to add to the document frequency dictionary
+        Return the document frequency for a given term.
         """
-        # Use set to get unique terms - each term should only increment document frequency once per document
-        for term in set(terms):
-            self.number_of_documents_containing_term[term] += 1
+        if self.total_documents == 0 or term not in self.document_frequency:
+            return 0
+        return self.document_frequency[term]
 
     def get_idf(self, term: str) -> float:
         """
@@ -123,36 +135,32 @@ class TFIDF:
             - No documents have been processed (total_documents == 0)
             - The term has not been seen in any document
         """
-        if (
-            self.total_documents == 0
-            or term not in self.number_of_documents_containing_term
-        ):
+        if self.get_df(term) == 0:
             return 0.0
-
-        # IDF = log(total_documents / documents_containing_term)
-        return math.log(
-            (self.total_documents / self.number_of_documents_containing_term[term]),
-            math.e,
-        )
+        return math.log(self.total_documents / self.get_df(term), 10)
 
     def get_tf(self, text: str, term: str) -> float:
         """
         Return the TF (term frequency) value for a given term in a document.
 
-        TF measures how frequently a term appears in a specific document.
-        It is calculated as the count of occurrences of the term in the document.
+        TF is the share of token mass in the document: occurrences of `term` divided by
+        the total number of tokens (with multiplicity), matching `hsql_create_tf_idf_tbl`
+        in tf_idf.sql.
 
         Args:
             text: The text content of the document to analyze
             term: The term to compute TF for
 
         Returns:
-            The TF value (count of term occurrences) as a float. Returns 0.0 if the term
-            does not appear in the text.
+            TF as a float in [0, 1]. Returns 0.0 if the term does not appear in the text
+            or the document has no tokens.
         """
-        # Count the number of times a term appears in a document
-        terms = self.tokenize(text)
-        return terms.count(term)
+        # TF = term count / total token count in document (matches PostgreSQL hsql_create_tf_idf_tbl).
+        terms = self.tokenize(text, output="dict")
+        total_tokens = float(sum(terms.values()))
+        if total_tokens == 0.0:
+            return 0.0
+        return float(terms.get(term, 0)) / total_tokens
 
     def get_tfidf(self, text: str, term: str) -> float:
         """
@@ -178,47 +186,35 @@ class TFIDF:
         idf = self.get_idf(term)
         return tf * idf
 
-    def get_tfidf_weight_vector(self, text: str) -> Dict[str, float]:
+    def get_tfidf_vector(self, text: str) -> Dict[str, float]:
         """
-        Return the TF-IDF weight vector for a document.
+        Return the TF-IDF vector for a text.
+
+        The TF-IDF vector is a dictionary mapping terms to their TF-IDF scores.
 
         Args:
-            text: The text to compute the TF-IDF weight vector for
-
-        Returns:
-            Dictionary mapping terms to their TF-IDF weight
+            text: The text to compute the TF-IDF vector for
         """
-        vector = {}
-        for term in self.tokenize(text):
-            vector[term] = self.get_tfidf(text, term)
-        return vector
+        terms = self.tokenize(text, output="list")
+        return {term: self.get_tfidf(text, term) for term, _ in terms}
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> Dict[str, Any]:
         """
         Return statistics about the current collection.
 
         Returns:
             Dictionary with collection statistics:
             - total_documents: Total number of documents
-            - total_unique_tokens: Total number of unique tokens
+            - document_frequency: Dictionary mapping terms to the number of documents that contain them
         """
         return {
             "total_documents": self.total_documents,
-            "total_unique_tokens": len(self.number_of_documents_containing_term),
+            "document_frequency": self.document_frequency,
         }
 
-    def print_stats(self) -> None:
+    def print_document_frequency_stats(self) -> None:
         """
         Print the statistics about the current collection.
         """
         print(f"Total documents: {self.total_documents}")
-        print(f"Total unique tokens: {len(self.number_of_documents_containing_term)}")
-        for term, count in self.number_of_documents_containing_term.items():
-            print(f"Term: {term}, Count: {count}")
-
-    def print_document_frequency(self) -> None:
-        """
-        Print the document frequency statistics.
-        """
-        for term, count in self.number_of_documents_containing_term.items():
-            print(f"Term: {term}, Count: {count}")
+        print(f"Total unique tokens: {len(self.document_frequency)}")

@@ -3,52 +3,6 @@
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS plpgsql;
 
-
-/* #########################################################
-Function to create or manage the output cluster table
-Input: output_cluster_table - the name of the table to store clusters
-Input: overwrite_output_cluster_table - whether to overwrite the table if it exists (TRUE) or raise an error (FALSE)
-Output: void - creates or manages the table
-######################################################### */
-CREATE OR REPLACE FUNCTION cls_create_cluster_table(output_cluster_table text, overwrite_output_cluster_table boolean DEFAULT FALSE)
-    RETURNS VOID
-    AS $$
-DECLARE
-    table_exists boolean;
-BEGIN
-    -- Check if output_cluster_table exists
-    RAISE NOTICE 'Checking if table % exists', output_cluster_table;
-    SELECT
-        EXISTS (
-            SELECT
-            FROM
-                information_schema.tables
-            WHERE
-                table_schema = current_schema()
-                AND table_name = output_cluster_table) INTO table_exists;
-    -- If output_cluster_table exists, handle based on overwrite_output_cluster_table parameter
-    IF table_exists THEN
-        RAISE NOTICE 'Table % exists.', output_cluster_table;
-        IF overwrite_output_cluster_table THEN
-            -- Drop the table if it exists
-            RAISE NOTICE 'Dropping the table %', output_cluster_table;
-            EXECUTE format('DROP TABLE IF EXISTS %I', output_cluster_table);
-        ELSE
-            -- Raise error if overwrite_output_cluster_table is false and table exists
-            RAISE EXCEPTION 'Table % already exists. Set overwrite_output_cluster_table=true to drop the table.', output_cluster_table;
-        END IF;
-    END IF;
-    -- Create the output_cluster_table if it doesn't exist
-    RAISE NOTICE 'Creating the table %', output_cluster_table;
-    EXECUTE format('CREATE TABLE IF NOT EXISTS %I (
-        id SERIAL PRIMARY KEY,
-        centroid tfidf_term_weight[]
-    )', output_cluster_table);
-END;
-$$
-LANGUAGE plpgsql;
-
-
 /* #########################################################
  Incremental clustering function using TF-IDF and cosine similarity
  Input: input_table - the table of text documents
@@ -60,7 +14,7 @@ LANGUAGE plpgsql;
  Input: overwrite_output_cluster_table - whether to overwrite the output cluster table if it exists or raise an error if the overwrite is false and the table exists
  Output: void - the function does not return any value
  ######################################################### */
-CREATE OR REPLACE FUNCTION cls_incremental_clustering(input_table text, text_column text, timestamp_column text, model_table text, output_cluster_table text, threshold float DEFAULT 0.7, overwrite_output_cluster_table boolean DEFAULT FALSE)
+CREATE OR REPLACE FUNCTION cls_incremental_clustering(input_table text, text_column text, timestamp_column text, model_table text, output_cluster_table text, threshold float DEFAULT 0.7)
     RETURNS VOID
     AS $$
 DECLARE
@@ -86,7 +40,7 @@ BEGIN
         RAISE NOTICE 'Processing document number %', row_number;
         row_number := row_number + 1;
         -- Vectorize the content once
-        content_vector := tfidf_vectorize(content, model_table);
+        content_vector := hsql_vectorize_itr(content, model_table);
         -- Initialize variables for finding nearest cluster
         nearest_cluster_id := NULL;
         min_distance := NULL;
