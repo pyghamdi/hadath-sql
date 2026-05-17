@@ -11,7 +11,7 @@
 --     psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U postgres \
 --       -v db_host=127.0.0.1 \
 --       -v db_port=5432 \
---       -v db_name=hsql_dev_test \
+--       -v db_name=hsql_test \
 --       -v db_user=postgres \
 --       -v db_password=secret \
 --       -v db_admin_name=postgres \
@@ -24,7 +24,7 @@
 -- DEFAULTS (used when a -v variable is omitted)
 --   db_host        127.0.0.1     Server host for \setenv and Python.
 --   db_port        5432          Server port.
---   db_name        hsql_dev_test Target database (created if missing; see below).
+--   db_name        hsql_test Target database (created if missing; see below).
 --   db_user        postgres      Role for connections and Python (PGUSER).
 --   db_password    postgres      Password for Python (PGPASSWORD).
 --   db_admin_name  postgres      Maintenance DB for first \connect; used only to create db_name if it does not exist.
@@ -55,7 +55,7 @@
 
 \if :{?db_name}
 \else
-\set db_name hsql_dev_test
+\set db_name hsql_test
 \endif
 
 \if :{?db_user}

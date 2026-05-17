@@ -9,7 +9,7 @@ To run the tests:
 Database connection uses these defaults:
 - host: 127.0.0.1
 - port: 5432  
-- database: hadathdb
+- database: hsql_test
 - user: postgres
 - password: (empty)
 """
@@ -29,7 +29,7 @@ class PostgreSQLTestSetup:
         self.db_config = {
             'host': '127.0.0.1',
             'port': '5432',
-            'database': 'hadathdb',
+            'database': 'hsql_test',
             'user': 'postgres',
             'password': 'postgres'
         }
