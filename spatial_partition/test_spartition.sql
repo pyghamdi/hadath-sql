@@ -26,3 +26,12 @@ GROUP BY spatial_partition;
 
 SELECT 'Riyadh' as city, (5195870.62 - -20037508.34) / 500000::integer as x, (2810613.91 - -20037508.34) / 500000::integer as y;
 
+-- Shifted grid examples (shift by cell units)
+SELECT 'Makkah_shift_x1_y-2' AS City, *
+FROM spatial_partition_shifted(
+  4433432.304231072,
+  2442329.093011221,
+  50000,
+  1,
+  -2
+);

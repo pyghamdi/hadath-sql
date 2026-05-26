@@ -1,7 +1,7 @@
 -- Active: 1757744206257@@127.0.0.1@5432@hadathdb
 
 -- Drop existing objects if they exist
-DROP FUNCTION IF EXISTS time_partition;
+DROP FUNCTION IF EXISTS time_partition CASCADE;
 DROP TYPE IF EXISTS temporal_partition_id;
 
 -- Create a custom type for the time partition key
@@ -61,12 +61,3 @@ BEGIN
     RETURN (partition_start, partition_end);
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
-
--- =====================================================
--- Usage Examples
--- =====================================================
-
-SELECT temporal_partition(TIMESTAMP '2025-01-01 01:10:00', INTERVAL '30 minutes') AS partition_30min,
-    temporal_partition(TIMESTAMP '2025-01-01 01:10:00', INTERVAL '1 hour') AS partition_1hour,
-    temporal_partition(TIMESTAMP '2025-01-01 01:10:00', INTERVAL '3 hour') AS partition_3hour;
-    
