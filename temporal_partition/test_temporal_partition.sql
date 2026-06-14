@@ -33,7 +33,7 @@ SELECT temporal_partition(TIMESTAMP '2025-01-01 00:00:00', INTERVAL '15 minutes'
 
 SELECT temporal_partition(TIMESTAMP '2025-01-01 00:00:00', INTERVAL '30 minutes');
 
-SELECT temporal_partition(TIMESTAMP '2025-01-01 00:00:00', INTERVAL '1 hour');
+SELECT temporal_partition(TIMESTAMP '2026-06-18 00:40:00', INTERVAL '1 hour');
 
 SELECT temporal_partition(TIMESTAMP '2025-01-01 00:00:00', INTERVAL '4 hour');
 
