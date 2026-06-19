@@ -35,3 +35,24 @@ FROM spatial_partition_shifted(
   1,
   -2
 );
+
+
+-- Time the following SQL statement using EXPLAIN ANALYZE to measure execution time
+EXPLAIN ANALYZE
+SELECT
+    id,
+    x,
+    y,
+    spatial_partition(x, y, 50000) AS partition
+FROM spatial_partition_eval_data
+WHERE id <= 100000;
+
+EXPLAIN ANALYZE
+SELECT
+    spatial_partition(x, y, 50000) AS partition,
+    COUNT(*) AS point_count
+FROM spatial_partition_eval_data
+WHERE id <= 1000000s
+GROUP BY partition
+ORDER BY point_count DESC;
+-- LIMIT 20;
