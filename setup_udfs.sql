@@ -4,7 +4,7 @@
 --   1) util helpers (e.g. hsql_table_exists_any_schema)
 --   2) TF-IDF core UDFs and `tfidf_weight` type (`hsql_*` table builders in tf_idf.sql)
 --   3) Aggregate UDAs: count_shared_terms, entropy (agg_funcs/)
---   4) Temporal partitioning (`temporal_partition`, `temporal_partition_id`)
+--   4) Temporal partitioning (`time_partition`, `time_partition_id`)
 --   5) Spatial partitioning (`spatial_partition`, `py_spatial_partition`, `spatial_partition_id`)
 --   6) Single-pass clustering (`hsql_*` in single_pass_clustering/sp_clustering.sql)
 --
@@ -29,8 +29,8 @@
 \echo '>>> agg_funcs/entropy.sql'
 \ir agg_funcs/entropy.sql
 
-\echo '>>> temporal_partition/temporal_partitioning.sql'
-\ir temporal_partition/temporal_partitioning.sql
+\echo '>>> time_partition/time_partitioning.sql'
+\ir time_partition/time_partitioning.sql
 
 \echo '>>> spatial_partition/space_partition.sql'
 \ir spatial_partition/space_partition.sql

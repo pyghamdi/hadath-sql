@@ -1,10 +1,10 @@
 """
-Test file for temporal_partition PostgreSQL function.
+Test file for time_partition PostgreSQL function.
 
 To run the tests:
 1. Install required packages: pip install pytest psycopg2-binary
-2. Create the temporal_partition function in your database first (run temporal_partitioning.sql)
-3. Run tests: pytest test_temporal_partition.py -v
+2. Create the time_partition function in your database first (run time_partitioning.sql)
+3. Run tests: pytest test_time_partition.py -v
 
 Database connection uses these defaults:
 - host: 127.0.0.1
@@ -70,7 +70,7 @@ def db_setup():
     # Connect to database
     setup.connect()
     
-    # Note: Make sure the temporal_partition function is already created in the database
+    # Note: Make sure the time_partition function is already created in the database
     
     yield setup
     
@@ -84,8 +84,8 @@ def db_connection(db_setup):
     return db_setup
 
 
-class TestTemporalPartition:
-    """Test class for the temporal_partition PostgreSQL function."""
+class TestTimePartition:
+    """Test class for the time_partition PostgreSQL function."""
     
     def to_string(self, timestamp: datetime):
         return timestamp.strftime("%Y-%m-%d %H:%M:%S")
@@ -103,20 +103,20 @@ class TestTemporalPartition:
 
     def test_basic_15_minute(self, db_connection):
         """
-        Test basic functionality of temporal_partition function with 15-minute intervals.
+        Test basic functionality of time_partition function with 15-minute intervals.
         
         This test verifies that:
         1. The function exists and can be called
         2. It returns the expected partition boundaries
-        3. The returned values match the expected format (temporal_partition_id type)
+        3. The returned values match the expected format (time_partition_id type)
         """
         # Test timestamp: 2025-01-01 14:30:00
         test_timestamp = '2025-01-01 00:00:00'
         interval_length = '15 minutes'
         
-        # Query the temporal_partition function
+        # Query the time_partition function
         query = """
-        SELECT * FROM temporal_partition(%s::timestamp, %s::interval);
+        SELECT * FROM time_partition(%s::timestamp, %s::interval);
         """
         
         result = db_connection.execute_query(query, (test_timestamp, interval_length))
@@ -145,7 +145,7 @@ class TestTemporalPartition:
 
     def test_basic_15_minute_shift_10_minutes(self, db_connection):
         """
-        Test basic functionality of temporal_partition function with 15-minute intervals and a 15-minute shift.
+        Test basic functionality of time_partition function with 15-minute intervals and a 15-minute shift.
         """
         test_timestamp = '2025-01-01 00:00:00'
         interval_length = '15 minutes'
@@ -153,7 +153,7 @@ class TestTemporalPartition:
         
         expected_partition = ('2024-12-31 23:55:00', '2025-01-01 00:10:00')
         query = """
-        SELECT * FROM temporal_partition(%s::timestamp, %s::interval, %s::interval);
+        SELECT * FROM time_partition(%s::timestamp, %s::interval, %s::interval);
         """
         
         result = db_connection.execute_query(query, (test_timestamp, interval_length, shift_interval))

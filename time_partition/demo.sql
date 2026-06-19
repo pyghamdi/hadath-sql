@@ -2,13 +2,13 @@
 -- Usage Examples
 -- =====================================================
 
-SELECT temporal_partition(TIMESTAMP '2025-01-01 01:10:00', INTERVAL '30 minutes') AS partition_30min,
-    temporal_partition(TIMESTAMP '2025-01-01 01:10:00', INTERVAL '1 hour') AS partition_1hour,
-    temporal_partition(TIMESTAMP '2025-01-01 01:10:00', INTERVAL '3 hour') AS partition_3hour;
+SELECT time_partition(TIMESTAMP '2025-01-01 01:10:00', INTERVAL '30 minutes') AS partition_30min,
+    time_partition(TIMESTAMP '2025-01-01 01:10:00', INTERVAL '1 hour') AS partition_1hour,
+    time_partition(TIMESTAMP '2025-01-01 01:10:00', INTERVAL '3 hour') AS partition_3hour;
 
     -- Example: Group rows by temporal partition and count per interval
     SELECT
-        temporal_partition(ts, INTERVAL '30 minutes') AS partition,
+        time_partition(ts, INTERVAL '30 minutes') AS partition,
         COUNT(*) AS event_count
     FROM
         (VALUES

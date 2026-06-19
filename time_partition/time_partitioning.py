@@ -7,7 +7,7 @@ from psycopg2.extensions import connection
 VALID_MINUTE_INTERVALS = {1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, 60}
 VALID_HOUR_INTERVALS = {1, 2, 3, 4, 6, 8, 12, 24}
 
-def get_temporal_partition(
+def get_time_partition(
     timestamp: datetime,
     interval_length: timedelta,
     shift_interval: Optional[timedelta] = None,

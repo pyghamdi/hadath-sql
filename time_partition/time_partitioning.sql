@@ -1,21 +1,23 @@
 -- Active: 1757744206257@@127.0.0.1@5432@hadathdb
 
 -- Drop existing objects if they exist
+DROP FUNCTION IF EXISTS temporal_partition CASCADE;
 DROP FUNCTION IF EXISTS time_partition CASCADE;
-DROP TYPE IF EXISTS temporal_partition_id;
+DROP TYPE IF EXISTS temporal_partition_id CASCADE;
+DROP TYPE IF EXISTS time_partition_id CASCADE;
 
 -- Create a custom type for the time partition key
-CREATE TYPE temporal_partition_id AS (
+CREATE TYPE time_partition_id AS (
     start_timestamp TIMESTAMP,
     end_timestamp TIMESTAMP
 );
 
--- Create a function to get time partition key (returns temporal_partition_id)
-CREATE OR REPLACE FUNCTION temporal_partition(
+-- Create a function to get time partition key (returns time_partition_id)
+CREATE OR REPLACE FUNCTION time_partition(
     input_timestamp TIMESTAMP,
     interval_length INTERVAL,
     shift_interval INTERVAL DEFAULT INTERVAL '0'
-) RETURNS temporal_partition_id AS $$
+) RETURNS time_partition_id AS $$
 DECLARE
     partition_start TIMESTAMP;
     partition_end TIMESTAMP;
