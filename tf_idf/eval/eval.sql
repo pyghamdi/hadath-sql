@@ -150,8 +150,9 @@ DO $$
 BEGIN
     EXECUTE $fn$
         DROP FUNCTION IF EXISTS tfidf_eval_runtime(text, text, text, text, integer, integer);
+        DROP FUNCTION IF EXISTS hsql_tfidf_eval_runtime(text, text, text, text, integer, integer);
 
-        CREATE OR REPLACE FUNCTION tfidf_eval_runtime(
+        CREATE OR REPLACE FUNCTION hsql_tfidf_eval_runtime(
             p_source_tbl text,
             p_input_view text,
             p_doc_id_col text,
@@ -239,7 +240,7 @@ BEGIN
 END;
 $$;
 
-SELECT tfidf_eval_runtime(
+SELECT hsql_tfidf_eval_runtime(
     :'source_tbl',
     :'input_view',
     :'doc_id_col',

@@ -1,9 +1,9 @@
 -- #########################################################
--- time_partition UDF runtime evaluation
+-- hsql_time_partition UDF runtime evaluation
 -- #########################################################
 --
 -- Builds a 1M-row table with varied timestamps, then benchmarks
--- time_partition() on 100K, 200K, ... 1M rows.
+-- hsql_time_partition() on 100K, 200K, ... 1M rows.
 --
 -- Usage (from repository root):
 --   PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U postgres \
@@ -56,7 +56,7 @@
 \echo '    max_rows=' :max_rows ', step_rows=' :step_rows
 \echo '    recreate_data=' :recreate_data
 
--- Ensure the UDF exists (idempotent when setup_udfs.sql was already run).
+-- Ensure the UDF exists (idempotent when install.sql was already run).
 \ir ../time_partitioning.sql
 
 \if :recreate_data
@@ -104,7 +104,7 @@ CREATE TABLE time_partition_eval_results (
 DO $$
 BEGIN
     EXECUTE $fn$
-        CREATE OR REPLACE FUNCTION time_partition_eval_runtime(
+        CREATE OR REPLACE FUNCTION hsql_time_partition_eval_runtime(
             p_source_tbl text,
             p_interval_length interval,
             p_shift_interval interval,
@@ -144,7 +144,7 @@ BEGIN
                         SUM(
                             EXTRACT(
                                 EPOCH FROM (
-                                    time_partition(ts, $1, $2)
+                                    hsql_time_partition(ts, $1, $2)
                                 ).start_timestamp
                             )
                         ),
@@ -176,7 +176,7 @@ BEGIN
                     v_checksum
                 );
 
-                RAISE NOTICE 'time_partition on % rows: % ms (checksum=%)',
+                RAISE NOTICE 'hsql_time_partition on % rows: % ms (checksum=%)',
                     v_row_limit,
                     ROUND(v_elapsed_ms, 3),
                     v_checksum;
@@ -187,7 +187,7 @@ BEGIN
 END;
 $$;
 
-SELECT time_partition_eval_runtime(
+SELECT hsql_time_partition_eval_runtime(
     :'source_tbl',
     :'interval_length'::interval,
     :'shift_interval'::interval,

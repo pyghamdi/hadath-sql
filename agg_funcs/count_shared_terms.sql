@@ -5,14 +5,14 @@ count_shared_terms aggregate (count_shared_terms.sql)
 Aggregates for per-event (GROUP BY) text analytics.
 
 Defines:
-  - count_shared_terms(txt, minimum) — count of terms appearing in at least
+  - hsql_count_shared_terms(txt, minimum) — count of terms appearing in at least
     `minimum` tuples within the group
 
 A shared term is one that appears in >= `minimum` distinct tuples
 (rows) in the aggregate group. Tokenization matches hsql_process_text
 (English stemming via to_tsvector).
 
-Parallel aggregation uses COMBINEFUNC (count_shared_terms_combine) to sum
+Parallel aggregation uses COMBINEFUNC (hsql_count_shared_terms_combine) to sum
 per-term tuple counts across partial states.
 ################################################################################
 */
@@ -30,8 +30,13 @@ DROP FUNCTION IF EXISTS count_shared_terms_combine(jsonb, jsonb);
 DROP FUNCTION IF EXISTS count_shared_terms_final(jsonb);
 DROP FUNCTION IF EXISTS count_shared_terms_sfunc(jsonb, text, integer);
 
+DROP AGGREGATE IF EXISTS hsql_count_shared_terms(text, integer);
+DROP FUNCTION IF EXISTS hsql_count_shared_terms_combine(jsonb, jsonb);
+DROP FUNCTION IF EXISTS hsql_count_shared_terms_final(jsonb);
+DROP FUNCTION IF EXISTS hsql_count_shared_terms_sfunc(jsonb, text, integer);
 
-CREATE OR REPLACE FUNCTION count_shared_terms_sfunc(state jsonb, txt text, minimum integer)
+
+CREATE OR REPLACE FUNCTION hsql_count_shared_terms_sfunc(state jsonb, txt text, minimum integer)
 RETURNS jsonb
 LANGUAGE sql
 PARALLEL SAFE
@@ -57,7 +62,7 @@ AS $$
 $$;
 
 
-CREATE OR REPLACE FUNCTION count_shared_terms_combine(state1 jsonb, state2 jsonb)
+CREATE OR REPLACE FUNCTION hsql_count_shared_terms_combine(state1 jsonb, state2 jsonb)
 RETURNS jsonb
 LANGUAGE sql
 IMMUTABLE
@@ -97,7 +102,7 @@ AS $$
 $$;
 
 
-CREATE OR REPLACE FUNCTION count_shared_terms_final(state jsonb)
+CREATE OR REPLACE FUNCTION hsql_count_shared_terms_final(state jsonb)
 RETURNS integer
 LANGUAGE sql
 IMMUTABLE
@@ -118,10 +123,10 @@ AS $$
 $$;
 
 
-CREATE AGGREGATE count_shared_terms(text, integer) (
-    SFUNC = count_shared_terms_sfunc,
+CREATE AGGREGATE hsql_count_shared_terms(text, integer) (
+    SFUNC = hsql_count_shared_terms_sfunc,
     STYPE = jsonb,
-    FINALFUNC = count_shared_terms_final,
-    COMBINEFUNC = count_shared_terms_combine,
+    FINALFUNC = hsql_count_shared_terms_final,
+    COMBINEFUNC = hsql_count_shared_terms_combine,
     INITCOND = '{}'
 );

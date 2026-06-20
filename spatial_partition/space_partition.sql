@@ -14,7 +14,7 @@ CREATE TYPE spatial_partition_id AS (
 
 -- -- Python-based spatial partition function (alternative implementation)
 -- -- This function uses Python for the calculation (requires plpython3u extension)
--- CREATE OR REPLACE FUNCTION py_spatial_partition(x float, y float, cell_length int)
+-- CREATE OR REPLACE FUNCTION hsql_py_spatial_partition(x float, y float, cell_length int)
 --   RETURNS spatial_partition_id
 -- AS $$
 -- # Web Mercator projection bounds (EPSG:3857)
@@ -35,7 +35,10 @@ CREATE TYPE spatial_partition_id AS (
 --
 -- Note: Grid origin is at (-20037508, -20037508) which corresponds to
 --       Web Mercator projection bounds (EPSG:3857)
-CREATE OR REPLACE FUNCTION spatial_partition(x float, y float, cell_length numeric)
+DROP FUNCTION IF EXISTS spatial_partition(float, float, numeric) CASCADE;
+DROP FUNCTION IF EXISTS hsql_spatial_partition(float, float, numeric) CASCADE;
+
+CREATE OR REPLACE FUNCTION hsql_spatial_partition(x float, y float, cell_length numeric)
   RETURNS spatial_partition_id
 AS $$
 DECLARE
@@ -61,7 +64,10 @@ $$ LANGUAGE plpgsql;
 --   - Positive s_x moves partitions in +x direction.
 --   - Positive s_y moves partitions in +y direction.
 --   - Negative shifts are allowed (grid can be shifted in any direction).
-CREATE OR REPLACE FUNCTION spatial_partition_shifted(
+DROP FUNCTION IF EXISTS spatial_partition_shifted(float, float, numeric, integer, integer) CASCADE;
+DROP FUNCTION IF EXISTS hsql_spatial_partition_shifted(float, float, numeric, integer, integer) CASCADE;
+
+CREATE OR REPLACE FUNCTION hsql_spatial_partition_shifted(
   x float,
   y float,
   cell_length numeric,

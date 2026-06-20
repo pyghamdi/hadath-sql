@@ -64,7 +64,7 @@ DO $$
 BEGIN
     -- Recreate the helper function each run for script idempotence.
     EXECUTE $fn$
-        CREATE OR REPLACE FUNCTION tfidf_eval_runtime(
+        CREATE OR REPLACE FUNCTION hsql_tfidf_eval_runtime(
             p_input_tbl text,
             p_doc_id_col text,
             p_text_col text,
@@ -124,7 +124,7 @@ $$ LANGUAGE plpgsql;
 
 
 -- Run evaluation using values passed from psql variables.
-SELECT tfidf_eval_runtime(
+SELECT hsql_tfidf_eval_runtime(
     :'input_tbl',
     :'doc_id_col',
     :'text_col',

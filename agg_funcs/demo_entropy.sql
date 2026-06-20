@@ -1,7 +1,7 @@
 -- #########################################################
 -- Demo: word entropy (plain SQL)
 --
--- Prerequisite: install the entropy aggregate first (run entropy.sql once).
+-- Prerequisite: install the hsql_entropy aggregate first (run entropy.sql once).
 --
 -- Token counts for "cat hat cat bat" (whitespace split, as-is):
 --   cat = 2, hat = 1, bat = 1  (4 tokens, V = 3)
@@ -10,7 +10,7 @@
 -- #########################################################
 
 -- Entropy value for one sample
-SELECT entropy(txt) AS entropy_bits
+SELECT hsql_entropy(txt) AS entropy_bits
 -- FROM (VALUES ('cat hat cat bat')) AS v(txt);
 FROM (
     VALUES 
@@ -21,9 +21,9 @@ FROM (
 -- Threshold test: return 1 if entropy >= 2, else -1
 SELECT
     txt AS sample,
-    entropy(txt) AS entropy_bits,
+    hsql_entropy(txt) AS entropy_bits,
     CASE
-        WHEN entropy(txt) >= 2 THEN 1
+        WHEN hsql_entropy(txt) >= 2 THEN 1
         ELSE -1
     END AS entropy_flag
 FROM (
@@ -35,18 +35,18 @@ GROUP BY txt;
 
 
 -- Using entropy over event groups
--- Given rows (event_id, txt), GROUP BY event_id and apply entropy(txt). The
+-- Given rows (event_id, txt), GROUP BY event_id and apply hsql_entropy(txt). The
 -- aggregate pools every txt value in the group into one word-frequency bag, then
--- returns H(W) in bits (base-2). Use CASE WHEN entropy(txt) >= <threshold> to
+-- returns H(W) in bits (base-2). Use CASE WHEN hsql_entropy(txt) >= <threshold> to
 -- map each event to a flag (e.g. 1 if diverse enough, -1 otherwise).
 
 -- Per-event entropy flag: 1 if H(W) >= 2, else -1 (grouped by event_id)
 SELECT
     event_id,
-    /* entropy(txt) AS "H(W)", */
+    /* hsql_entropy(txt) AS "H(W)", */
     COUNT(DISTINCT username) AS "Username Count",
     CASE
-        WHEN entropy(txt) >= 2 THEN 1
+        WHEN hsql_entropy(txt) >= 2 THEN 1
         ELSE -1
     END AS entropy_flag
 FROM (

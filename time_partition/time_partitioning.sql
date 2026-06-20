@@ -3,6 +3,7 @@
 -- Drop existing objects if they exist
 DROP FUNCTION IF EXISTS temporal_partition CASCADE;
 DROP FUNCTION IF EXISTS time_partition CASCADE;
+DROP FUNCTION IF EXISTS hsql_time_partition CASCADE;
 DROP TYPE IF EXISTS temporal_partition_id CASCADE;
 DROP TYPE IF EXISTS time_partition_id CASCADE;
 
@@ -13,7 +14,7 @@ CREATE TYPE time_partition_id AS (
 );
 
 -- Create a function to get time partition key (returns time_partition_id)
-CREATE OR REPLACE FUNCTION time_partition(
+CREATE OR REPLACE FUNCTION hsql_time_partition(
     input_timestamp TIMESTAMP,
     interval_length INTERVAL,
     shift_interval INTERVAL DEFAULT INTERVAL '0'

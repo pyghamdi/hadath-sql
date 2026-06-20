@@ -1,16 +1,16 @@
--- Run TF-IDF and clustering DDL in dependency order.
+-- Install HadathDB UDFs, UDAs, and custom types in dependency order.
 --
 -- Loads:
 --   1) util helpers (e.g. hsql_table_exists_any_schema)
 --   2) TF-IDF core UDFs and `tfidf_weight` type (`hsql_*` table builders in tf_idf.sql)
---   3) Aggregate UDAs: count_shared_terms, entropy (agg_funcs/)
---   4) Temporal partitioning (`time_partition`, `time_partition_id`)
---   5) Spatial partitioning (`spatial_partition`, `py_spatial_partition`, `spatial_partition_id`)
+--   3) Aggregate UDAs: hsql_count_shared_terms, hsql_entropy (agg_funcs/)
+--   4) Temporal partitioning (`hsql_time_partition`, `time_partition_id`)
+--   5) Spatial partitioning (`hsql_spatial_partition`, `hsql_py_spatial_partition`, `spatial_partition_id`)
 --   6) Single-pass clustering (`hsql_*` in single_pass_clustering/sp_clustering.sql)
 --
 -- This file uses psql meta-commands (\ir, \echo). Run it with psql from the
 -- repository root, for example:
---   psql -v ON_ERROR_STOP=1 -d <database> -f setup_udfs.sql
+--   psql -v ON_ERROR_STOP=1 -d <database> -f install.sql
 --
 -- Plain SQL executed on the server cannot load other files; psql is the usual way
 -- to chain scripts. \ir paths are resolved relative to this file's directory.

@@ -5,17 +5,17 @@ entropy aggregate (entropy.sql)
 Aggregates for per-event (GROUP BY) text analytics.
 
 Defines:
-  - entropy(txt) — event word entropy H(W) (base 2)
+  - hsql_entropy(txt) — event word entropy H(W) (base 2)
 
   H(W) = -sum_{i=1}^{V} P(w_i) log_2 P(w_i)
   where P(w_i) = count(w_i) / total word count in the group.
 
 Tokenization: whitespace split, no stemming; words are counted as-is.
-Parallel aggregation uses COMBINEFUNC (entropy_combine).
+Parallel aggregation uses COMBINEFUNC (hsql_entropy_combine).
 
 Demo:
   psql -f agg_funcs/demo_entropy.sql
-  -- entropy('cat hat cat bat') => 1.5
+  -- hsql_entropy('cat hat cat bat') => 1.5
 ################################################################################
 */
 
@@ -24,8 +24,13 @@ DROP FUNCTION IF EXISTS entropy_combine(jsonb, jsonb);
 DROP FUNCTION IF EXISTS entropy_final(jsonb);
 DROP FUNCTION IF EXISTS entropy_sfunc(jsonb, text);
 
+DROP AGGREGATE IF EXISTS hsql_entropy(text);
+DROP FUNCTION IF EXISTS hsql_entropy_combine(jsonb, jsonb);
+DROP FUNCTION IF EXISTS hsql_entropy_final(jsonb);
+DROP FUNCTION IF EXISTS hsql_entropy_sfunc(jsonb, text);
 
-CREATE OR REPLACE FUNCTION entropy_sfunc(state jsonb, txt text)
+
+CREATE OR REPLACE FUNCTION hsql_entropy_sfunc(state jsonb, txt text)
 RETURNS jsonb
 LANGUAGE sql
 PARALLEL SAFE
@@ -53,7 +58,7 @@ AS $$
 $$;
 
 
-CREATE OR REPLACE FUNCTION entropy_combine(state1 jsonb, state2 jsonb)
+CREATE OR REPLACE FUNCTION hsql_entropy_combine(state1 jsonb, state2 jsonb)
 RETURNS jsonb
 LANGUAGE sql
 IMMUTABLE
@@ -83,7 +88,7 @@ AS $$
 $$;
 
 
-CREATE OR REPLACE FUNCTION entropy_final(state jsonb)
+CREATE OR REPLACE FUNCTION hsql_entropy_final(state jsonb)
 RETURNS double precision
 LANGUAGE sql
 IMMUTABLE
@@ -114,10 +119,10 @@ AS $$
 $$;
 
 
-CREATE AGGREGATE entropy(text) (
-    SFUNC = entropy_sfunc,
+CREATE AGGREGATE hsql_entropy(text) (
+    SFUNC = hsql_entropy_sfunc,
     STYPE = jsonb,
-    FINALFUNC = entropy_final,
-    COMBINEFUNC = entropy_combine,
+    FINALFUNC = hsql_entropy_final,
+    COMBINEFUNC = hsql_entropy_combine,
     INITCOND = '{}'
 );

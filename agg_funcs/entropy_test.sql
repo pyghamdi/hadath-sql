@@ -5,7 +5,7 @@ entropy_test aggregate (entropy_test.sql)
 Aggregates for per-event (GROUP BY) text analytics.
 
 Defines:
-  - entropy_test(txt, threshold) — returns 1 when event word entropy
+  - hsql_entropy_test(txt, threshold) — returns 1 when event word entropy
     H(W) >= threshold, else -1
 
 Event entropy (base 2):
@@ -13,7 +13,7 @@ Event entropy (base 2):
   where P(w_i) = count(w_i) / total word count in the group.
 
 Tokenization: whitespace split, no stemming; words are counted as-is.
-Parallel aggregation uses COMBINEFUNC (entropy_test_combine).
+Parallel aggregation uses COMBINEFUNC (hsql_entropy_test_combine).
 ################################################################################
 */
 
@@ -22,8 +22,13 @@ DROP FUNCTION IF EXISTS entropy_test_combine(jsonb, jsonb);
 DROP FUNCTION IF EXISTS entropy_test_final(jsonb);
 DROP FUNCTION IF EXISTS entropy_test_sfunc(jsonb, text, double precision);
 
+DROP AGGREGATE IF EXISTS hsql_entropy_test(text, double precision);
+DROP FUNCTION IF EXISTS hsql_entropy_test_combine(jsonb, jsonb);
+DROP FUNCTION IF EXISTS hsql_entropy_test_final(jsonb);
+DROP FUNCTION IF EXISTS hsql_entropy_test_sfunc(jsonb, text, double precision);
 
-CREATE OR REPLACE FUNCTION entropy_test_sfunc(
+
+CREATE OR REPLACE FUNCTION hsql_entropy_test_sfunc(
     state jsonb,
     txt text,
     threshold double precision
@@ -56,7 +61,7 @@ AS $$
 $$;
 
 
-CREATE OR REPLACE FUNCTION entropy_test_combine(state1 jsonb, state2 jsonb)
+CREATE OR REPLACE FUNCTION hsql_entropy_test_combine(state1 jsonb, state2 jsonb)
 RETURNS jsonb
 LANGUAGE sql
 IMMUTABLE
@@ -96,7 +101,7 @@ AS $$
 $$;
 
 
-CREATE OR REPLACE FUNCTION entropy_test_final(state jsonb)
+CREATE OR REPLACE FUNCTION hsql_entropy_test_final(state jsonb)
 RETURNS integer
 LANGUAGE sql
 IMMUTABLE
@@ -137,10 +142,10 @@ AS $$
 $$;
 
 
-CREATE AGGREGATE entropy_test(text, double precision) (
-    SFUNC = entropy_test_sfunc,
+CREATE AGGREGATE hsql_entropy_test(text, double precision) (
+    SFUNC = hsql_entropy_test_sfunc,
     STYPE = jsonb,
-    FINALFUNC = entropy_test_final,
-    COMBINEFUNC = entropy_test_combine,
+    FINALFUNC = hsql_entropy_test_final,
+    COMBINEFUNC = hsql_entropy_test_combine,
     INITCOND = '{}'
 );

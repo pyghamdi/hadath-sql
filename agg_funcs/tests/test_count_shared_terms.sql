@@ -1,5 +1,5 @@
 -- #########################################################
--- Tests for count_shared_terms(txt, minimum) aggregate (agg_funcs/count_shared_terms.sql).
+-- Tests for hsql_count_shared_terms(txt, minimum) aggregate (agg_funcs/count_shared_terms.sql).
 --
 -- HOW TO RUN (from repository root):
 --
@@ -16,7 +16,7 @@
 -- FLOW
 --   1) Ensure db_name exists
 --   2) Load tf_idf/tf_idf.sql (hsql_process_text) and agg_funcs/count_shared_terms.sql
---   3) Run count_shared_terms cases; raise if any got != want
+--   3) Run hsql_count_shared_terms cases; raise if any got != want
 -- #########################################################
 
 \set ON_ERROR_STOP on
@@ -85,7 +85,7 @@ INSERT INTO _count_shared_terms_test_results (test_id, want, got) VALUES
     (
         'three_terms_three_tuples_min3',
         3,
-        (SELECT count_shared_terms(txt, 3)
+        (SELECT hsql_count_shared_terms(txt, 3)
          FROM (VALUES
              ('apple banana cherry'),
              ('apple banana cherry'),
@@ -95,7 +95,7 @@ INSERT INTO _count_shared_terms_test_results (test_id, want, got) VALUES
     (
         'two_tuples_below_min3',
         0,
-        (SELECT count_shared_terms(txt, 3)
+        (SELECT hsql_count_shared_terms(txt, 3)
          FROM (VALUES
              ('apple banana cherry'),
              ('apple banana cherry')
@@ -104,7 +104,7 @@ INSERT INTO _count_shared_terms_test_results (test_id, want, got) VALUES
     (
         'three_shared_terms_min2_mixed_rows',
         3,
-        (SELECT count_shared_terms(txt, 2)
+        (SELECT hsql_count_shared_terms(txt, 2)
          FROM (VALUES
              ('apple banana cherry'),
              ('apple banana cherry'),
@@ -114,13 +114,13 @@ INSERT INTO _count_shared_terms_test_results (test_id, want, got) VALUES
     (
         'empty_group',
         0,
-        (SELECT count_shared_terms(txt, 3)
+        (SELECT hsql_count_shared_terms(txt, 3)
          FROM (SELECT NULL::text AS txt WHERE false) AS v)
     ),
     (
         'once_per_tuple_repeated_token',
         1,
-        (SELECT count_shared_terms(txt, 2)
+        (SELECT hsql_count_shared_terms(txt, 2)
          FROM (VALUES
              ('apple apple apple'),
              ('apple apple')
@@ -129,7 +129,7 @@ INSERT INTO _count_shared_terms_test_results (test_id, want, got) VALUES
     (
         'group_event1_min2',
         1,
-        (SELECT count_shared_terms(txt, 2)
+        (SELECT hsql_count_shared_terms(txt, 2)
          FROM (VALUES
              ('apple apple apple'),
              ('apple banana'),
@@ -139,7 +139,7 @@ INSERT INTO _count_shared_terms_test_results (test_id, want, got) VALUES
     (
         'null_and_empty_text_ignored',
         0,
-        (SELECT count_shared_terms(txt, 1)
+        (SELECT hsql_count_shared_terms(txt, 1)
          FROM (VALUES
              (NULL::text),
              ('')
@@ -148,8 +148,8 @@ INSERT INTO _count_shared_terms_test_results (test_id, want, got) VALUES
     (
         'combine_merges_partial_states',
         1,
-        (SELECT count_shared_terms_final(
-            count_shared_terms_combine(
+        (SELECT hsql_count_shared_terms_final(
+            hsql_count_shared_terms_combine(
                 '{"__minimum__": 2, "appl": 2, "banana": 1}'::jsonb,
                 '{"__minimum__": 2, "appl": 1, "cherri": 1}'::jsonb
             )
@@ -158,14 +158,14 @@ INSERT INTO _count_shared_terms_test_results (test_id, want, got) VALUES
     (
         'combine_matches_chained_sfunc',
         3,
-        (SELECT count_shared_terms_final(
-            count_shared_terms_combine(
-                count_shared_terms_sfunc(
-                    count_shared_terms_sfunc('{}'::jsonb, 'apple banana cherry', 2),
+        (SELECT hsql_count_shared_terms_final(
+            hsql_count_shared_terms_combine(
+                hsql_count_shared_terms_sfunc(
+                    hsql_count_shared_terms_sfunc('{}'::jsonb, 'apple banana cherry', 2),
                     'apple banana cherry',
                     2
                 ),
-                count_shared_terms_sfunc('{}'::jsonb, 'dog elephant', 2)
+                hsql_count_shared_terms_sfunc('{}'::jsonb, 'dog elephant', 2)
             )
         ))
     );
@@ -176,7 +176,7 @@ SELECT
     1,
     shared_term_count
 FROM (
-    SELECT event_id, count_shared_terms(txt, 2) AS shared_term_count
+    SELECT event_id, hsql_count_shared_terms(txt, 2) AS shared_term_count
     FROM (VALUES
         (1, 'apple apple apple'),
         (1, 'apple banana'),

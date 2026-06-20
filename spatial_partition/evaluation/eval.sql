@@ -1,9 +1,9 @@
 -- #########################################################
--- spatial_partition UDF runtime evaluation
+-- hsql_spatial_partition UDF runtime evaluation
 -- #########################################################
 --
 -- Builds a 1M-row table with Web Mercator (EPSG:3857) coordinates,
--- then benchmarks spatial_partition() on 100K, 200K, ... 1M rows.
+-- then benchmarks hsql_spatial_partition() on 100K, 200K, ... 1M rows.
 --
 -- Usage (from repository root):
 --   PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U postgres \
@@ -49,7 +49,7 @@
 \echo '    max_rows=' :max_rows ', step_rows=' :step_rows
 \echo '    recreate_data=' :recreate_data
 
--- Ensure the UDF exists (idempotent when setup_udfs.sql was already run).
+-- Ensure the UDF exists (idempotent when install.sql was already run).
 \ir ../space_partition.sql
 
 \if :recreate_data
@@ -109,7 +109,7 @@ CREATE TABLE spatial_partition_eval_results (
 DO $$
 BEGIN
     EXECUTE $fn$
-        CREATE OR REPLACE FUNCTION spatial_partition_eval_runtime(
+        CREATE OR REPLACE FUNCTION hsql_spatial_partition_eval_runtime(
             p_source_tbl text,
             p_cell_length numeric,
             p_max_rows integer,
@@ -149,7 +149,7 @@ BEGIN
                         0
                     )::bigint
                     FROM (
-                        SELECT spatial_partition(x, y, $1) AS p
+                        SELECT hsql_spatial_partition(x, y, $1) AS p
                         FROM %I
                         WHERE id <= $2
                     ) partitioned
@@ -175,7 +175,7 @@ BEGIN
                     v_checksum
                 );
 
-                RAISE NOTICE 'spatial_partition on % rows: % ms (checksum=%)',
+                RAISE NOTICE 'hsql_spatial_partition on % rows: % ms (checksum=%)',
                     v_row_limit,
                     ROUND(v_elapsed_ms, 3),
                     v_checksum;
@@ -186,7 +186,7 @@ BEGIN
 END;
 $$;
 
-SELECT spatial_partition_eval_runtime(
+SELECT hsql_spatial_partition_eval_runtime(
     :'source_tbl',
     :'cell_length'::numeric,
     :'max_rows'::integer,

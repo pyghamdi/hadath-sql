@@ -116,7 +116,7 @@ class TestTimePartition:
         
         # Query the time_partition function
         query = """
-        SELECT * FROM time_partition(%s::timestamp, %s::interval);
+        SELECT * FROM hsql_time_partition(%s::timestamp, %s::interval);
         """
         
         result = db_connection.execute_query(query, (test_timestamp, interval_length))
@@ -153,7 +153,7 @@ class TestTimePartition:
         
         expected_partition = ('2024-12-31 23:55:00', '2025-01-01 00:10:00')
         query = """
-        SELECT * FROM time_partition(%s::timestamp, %s::interval, %s::interval);
+        SELECT * FROM hsql_time_partition(%s::timestamp, %s::interval, %s::interval);
         """
         
         result = db_connection.execute_query(query, (test_timestamp, interval_length, shift_interval))
