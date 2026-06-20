@@ -4,11 +4,17 @@ Generate random long texts (1000+ words each) and write to a file.
 Downloads from Project Gutenberg or falls back to random word generation.
 """
 
+from __future__ import annotations
+
 import argparse
+import os
 import re
 import random
 import urllib.request
 import urllib.error
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_TEXTS_FILE = os.path.join(SCRIPT_DIR, "1000_long.txt")
 
 
 # Project Gutenberg plain text URLs (public domain books)
@@ -90,7 +96,7 @@ def split_into_chunks(text, min_words=1000):
     return chunks
 
 
-def generate_random_text(min_words=1000, word_list=None):
+def generate_random_text(min_words=100, word_list=None):
     """Generate random text from word list."""
     words = word_list or COMMON_WORDS
     selected = random.choices(words, k=min_words)
@@ -102,6 +108,66 @@ def generate_random_text(min_words=1000, word_list=None):
     result.append(".")
     text = " ".join(result)
     return re.sub(r"\s*\.\s*", ". ", text).strip()
+
+
+def normalize_text_line(text: str) -> str:
+    return " ".join(text.split())
+
+
+def load_texts_from_file(filepath: str, min_words: int = 1) -> list[str]:
+    """Load one text per line from a file."""
+    texts: list[str] = []
+    with open(filepath, encoding="utf-8") as f:
+        for line in f:
+            line = normalize_text_line(line.strip())
+            if line and len(line.split()) >= min_words:
+                texts.append(line)
+    return texts
+
+
+def normalize_document(text: str, min_words: int) -> str:
+    """Return a single-line document with exactly min_words words."""
+    words = text.split()
+    if len(words) >= min_words:
+        return " ".join(words[:min_words])
+
+    if not words:
+        return generate_random_text(min_words)
+
+    while len(words) < min_words:
+        words.extend(text.split())
+    return " ".join(words[:min_words])
+
+
+def load_document_source_pool(
+    min_words: int = 1000,
+    use_download: bool = True,
+    texts_file: str | None = DEFAULT_TEXTS_FILE,
+) -> list[str]:
+    """
+    Load benchmark documents from real-word sources.
+
+    Priority:
+      1) texts_file (default: dataset/1000_long.txt)
+      2) Project Gutenberg downloads
+      3) random text built from COMMON_WORDS
+    """
+    source_texts: list[str] = []
+
+    if texts_file and os.path.isfile(texts_file):
+        source_texts = load_texts_from_file(texts_file, min_words=1)
+        if source_texts:
+            print(f"Loaded {len(source_texts)} text(s) from {texts_file}")
+
+    if not source_texts and use_download:
+        print("Attempting to download from Project Gutenberg...")
+        source_texts = fetch_long_texts_from_gutenberg(10, min_words)
+
+    if not source_texts:
+        print("Generating fallback text from common English words...")
+        source_texts = [generate_random_text(min_words)]
+
+    return [normalize_document(text, min_words) for text in source_texts]
 
 
 def fetch_long_texts_from_gutenberg(num_texts, min_words=1000):
@@ -148,27 +214,27 @@ def main():
     )
     args = parser.parse_args()
 
-    texts = []
+    texts = load_document_source_pool(
+        min_words=args.min_words,
+        use_download=not args.no_download,
+        texts_file=None if args.no_download else DEFAULT_TEXTS_FILE,
+    )
 
-    if not args.no_download:
-        print("Attempting to download from Project Gutenberg...")
-        texts = fetch_long_texts_from_gutenberg(args.num, args.min_words)
-
-    # Fill remaining with random generation if needed
     while len(texts) < args.num:
-        n = args.num - len(texts)
-        print(f"Generating {n} random text(s)...")
-        for _ in range(n):
-            texts.append(generate_random_text(args.min_words))
+        texts.extend(
+            load_document_source_pool(
+                min_words=args.min_words,
+                use_download=not args.no_download,
+                texts_file=None,
+            )
+        )
 
-    texts = texts[:args.num]
+    texts = texts[: args.num]
 
     # Write to file: one text per line (escape newlines within text)
     with open(args.filename, "w", encoding="utf-8") as f:
-        for t in texts:
-            # Replace internal newlines with space for single-line format
-            line = " ".join(t.split())
-            f.write(line + "\n")
+        for text in texts:
+            f.write(normalize_text_line(text) + "\n")
 
     print(f"Wrote {len(texts)} texts to {args.filename}")
     word_counts = [len(t.split()) for t in texts]

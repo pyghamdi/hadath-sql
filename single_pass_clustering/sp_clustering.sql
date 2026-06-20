@@ -1,11 +1,10 @@
 /*
 ################################################################################
-Single-pass clustering over a precomputed TF-IDF table (sp_clustering.sql)
+Single-pass clustering with built-in TF-IDF (sp_clustering.sql)
 ################################################################################
-Implements the classic single-pass / leader clustering algorithm on top of a
-TF-IDF representation that already lives in a long-format table
-`(doc_id, term, weight)` (e.g. built by `hsql_create_tf_idf_tbl` in
-`tf_idf/tf_idf.sql`).
+Implements the classic single-pass / leader clustering algorithm. TF-IDF
+weights are materialized automatically via `hsql_create_tf_idf_tbl` (from
+`tf_idf/tf_idf.sql`) into `<output_tbl>_tfidf` before clustering runs.
 
 Algorithm (one pass over documents, ordered by `ts_col`):
   1. The first document becomes cluster 1; its TF-IDF vector is the centroid.
@@ -28,13 +27,12 @@ Output tables (all created by `hsql_create_tbls_for_single_pass_clustering`):
 Public functions:
   hsql_create_tbls_for_single_pass_clustering(output_tbl, centroid_tbl,
                                               assignments_tbl, overwrite_tbl)
-  hsql_single_pass_clustering(input_tbl, doc_id_col, ts_col,
-                              output_tbl, tfidf_tbl, threshold,
-                              overwrite_output)
+  hsql_single_pass_clustering(input_tbl, doc_id_col, text_col, ts_col,
+                              output_tbl, threshold, overwrite_output)
 
 Dependencies:
   - `hsql_table_exists_any_schema(text)` from `util/table_utils.sql`
-  - A TF-IDF table laid out as `(doc_id INTEGER, term TEXT, weight FLOAT)`
+  - `hsql_create_tf_idf_tbl` from `tf_idf/tf_idf.sql`
 ################################################################################
 */
 
@@ -129,28 +127,28 @@ $$ LANGUAGE plpgsql;
 /* ##############################################################################
 hsql_single_pass_clustering
 --------------------------------------------------------------------------------
-Runs single-pass clustering over the documents in `input_tbl`, using TF-IDF
-weights already materialized in `tfidf_tbl`. Documents are processed in the
-order given by `ts_col` (typically a timestamp), and each document is either
-assigned to the most similar existing cluster (when cosine similarity
->= threshold) or used to seed a new cluster.
+Runs single-pass clustering over the documents in `input_tbl`. TF-IDF weights
+are built first into `<output_tbl>_tfidf` via `hsql_create_tf_idf_tbl`, then
+documents are processed in the order given by `ts_col` (typically a timestamp).
+Each document is either assigned to the most similar existing cluster (when
+cosine similarity >= threshold) or used to seed a new cluster.
 
 Parameters:
   input_tbl         - Source document table (drives iteration order). Must
-                      contain `doc_id_col` and `ts_col` columns.
+                      contain `doc_id_col`, `text_col`, and `ts_col` columns.
   doc_id_col        - Column in `input_tbl` holding the document id (INTEGER).
-                      Must match the `doc_id` values in `tfidf_tbl`.
+  text_col          - Column in `input_tbl` holding document text for TF-IDF.
   ts_col            - Column in `input_tbl` used to ORDER BY when iterating.
-  output_tbl        - Base name for the three output tables (see below).
-  tfidf_tbl         - Existing TF-IDF table with schema
-                      `(doc_id INTEGER, term TEXT, weight FLOAT)`.
+  output_tbl        - Base name for the output tables (see below).
   threshold         - Minimum cosine similarity in [0, 1] required to attach a
                       document to an existing cluster instead of opening a new
                       one. Default 0.7.
-  overwrite_output  - If TRUE, drop and recreate the output tables when they
-                      already exist; otherwise raise. Default FALSE.
+  overwrite_output  - If TRUE, drop and recreate output tables (including
+                      `<output_tbl>_tfidf`) when they already exist; otherwise
+                      raise. Default FALSE.
 
 Side effects (tables created / populated):
+  <output_tbl>_tfidf                 TF-IDF weights (doc_id, term, weight).
   <output_tbl>                       Cluster registry (cid, doc_count).
   <output_tbl>_centroid              Per-cluster term weights.
   <output_tbl>_cluster_assignments   doc_id -> cid mapping.
@@ -178,17 +176,17 @@ Notes:
   - Tie-breaks between equally similar clusters go to the largest `cid`,
     i.e. the most recently created cluster
     (`ORDER BY sim DESC, b_norm.cid DESC`), keeping results deterministic.
-  - `tfidf_tbl` is read every time a document's vector is needed; it is not
-    modified.
+  - `<output_tbl>_tfidf` is built once at the start and read during clustering;
+    it is not modified after creation.
   - The similarity check tolerates a NULL `max_similarity` (no clusters yet or
     all-zero norms) by treating it as 0, matching the cosine-formula note above.
 ############################################################################## */
 CREATE OR REPLACE FUNCTION hsql_single_pass_clustering(
     input_tbl text,
     doc_id_col text,
+    text_col text,
     ts_col text,
     output_tbl text,
-    tfidf_tbl text,
     threshold float DEFAULT 0.7,
     overwrite_output boolean DEFAULT FALSE
 )
@@ -205,6 +203,7 @@ DECLARE
     bump_doc_count_query text;      -- Increment doc_count by 1 for a given cluster.
 
     -- Derived table names.
+    tfidf_tbl text := output_tbl || '_tfidf';
     centroid_tbl text := output_tbl || '_centroid';
     assignments_tbl text := output_tbl || '_cluster_assignments';
 
@@ -217,9 +216,8 @@ DECLARE
     existing_doc_count integer;     -- doc_count of the target cluster BEFORE adding this doc.
     final_cluster_count integer;    -- Number of clusters at completion (for the final NOTICE).
 BEGIN
-    IF NOT hsql_table_exists_any_schema(tfidf_tbl) THEN
-        RAISE EXCEPTION 'TF-IDF table % does not exist. Build it first (e.g. with hsql_create_tf_idf_tbl).', tfidf_tbl;
-    END IF;
+    RAISE NOTICE 'Building TF-IDF table %...', tfidf_tbl;
+    PERFORM hsql_create_tf_idf_tbl(input_tbl, doc_id_col, text_col, tfidf_tbl, overwrite_output);
 
     RAISE NOTICE 'Creating output tables %, %, %...', output_tbl, centroid_tbl, assignments_tbl;
     PERFORM hsql_create_tbls_for_single_pass_clustering(output_tbl, centroid_tbl, assignments_tbl, overwrite_output);
