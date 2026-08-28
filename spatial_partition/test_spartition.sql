@@ -2,7 +2,11 @@
 -- Using 50km x 50km grid cells (50,000 meters)
 -- Coordinates are in Web Mercator projection (EPSG:3857)
 
-SELECT 'Makkah' AS City, * FROM hsql_spatial_partition(4433432.304231072, 2442329.093011221, 50000);
+SELECT 'Makkah' AS City, hsql_spatial_partition(4433432.304231072, 2442329.093011221, 50000) AS partition;
+
+SELECT 'Makkah' AS City, * FROM hsql_spatial_partition(4433432.304231072, 2442329.093011221, 50000)
+UNION 
+SELECT 'Makkah_shift' AS City, * FROM hsql_spatial_partition_shifted(4433432.304231072, 2442329.093011221, 50000, 50000, 50000);
 
 SELECT 'Jeddah' AS City, * FROM hsql_spatial_partition(4362889.142915375, 2449900.2161562047, 50000);
 
