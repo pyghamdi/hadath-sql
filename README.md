@@ -1,4 +1,4 @@
-# HadathDB
+# HadathSQL
 
 PostgreSQL extensions for event detection analytics: TF-IDF, custom aggregate functions, temporal and spatial partitioning, and single-pass clustering — all callable from SQL.
 
