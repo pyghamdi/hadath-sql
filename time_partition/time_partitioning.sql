@@ -46,9 +46,9 @@ BEGIN
         END IF;
     END IF;
 
-    -- Validate shift interval
-    IF shift_interval >= interval_length THEN
-        RAISE EXCEPTION 'Shift interval must be less than interval length';
+    -- Validate shift interval (forward or backward, its magnitude must be less than the interval length)
+    IF shift_interval >= interval_length OR shift_interval <= -interval_length THEN
+        RAISE EXCEPTION 'Shift interval magnitude must be less than interval length';
     END IF;
     
     -- Calculate the start of the interval

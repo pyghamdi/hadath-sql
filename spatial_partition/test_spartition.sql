@@ -6,7 +6,7 @@ SELECT 'Makkah' AS City, hsql_spatial_partition(4433432.304231072, 2442329.09301
 
 SELECT 'Makkah' AS City, * FROM hsql_spatial_partition(4433432.304231072, 2442329.093011221, 50000)
 UNION 
-SELECT 'Makkah_shift' AS City, * FROM hsql_spatial_partition_shifted(4433432.304231072, 2442329.093011221, 50000, 50000, 50000);
+SELECT 'Makkah_shift' AS City, * FROM hsql_spatial_partition(4433432.304231072, 2442329.093011221, 50000, 50000, 50000);
 
 SELECT 'Jeddah' AS City, * FROM hsql_spatial_partition(4362889.142915375, 2449900.2161562047, 50000);
 
@@ -30,15 +30,24 @@ GROUP BY hsql_spatial_partition;
 
 SELECT 'Riyadh' as city, (5195870.62 - -20037508.34) / 500000::integer as x, (2810613.91 - -20037508.34) / 500000::integer as y;
 
--- Shifted grid examples (shift by cell units)
-SELECT 'Makkah_shift_x1_y-2' AS City, *
-FROM hsql_spatial_partition_shifted(
+-- Shifted grid examples (shifts are in meters)
+SELECT 'Makkah_shift_x25km_y-25km' AS City, *
+FROM hsql_spatial_partition(
   4433432.304231072,
   2442329.093011221,
   50000,
-  1,
-  -2
+  25000,
+  -25000
 );
+
+-- Shift along x only (s_y defaults to 0)
+SELECT 'Makkah_shift_x25km' AS City, *
+FROM hsql_spatial_partition(4433432.304231072, 2442329.093011221, 50000, 25000);
+
+-- 1-km cells, unshifted and shifted by 500 m: expected (24400, 22487) and (24399, 22486)
+SELECT 'Jeddah_1km' AS City, * FROM hsql_spatial_partition(4362889.14, 2449900.22, 1000)
+UNION ALL
+SELECT 'Jeddah_1km_shift_500m' AS City, * FROM hsql_spatial_partition(4362889.14, 2449900.22, 1000, 500, 500);
 
 
 -- Time the following SQL statement using EXPLAIN ANALYZE to measure execution time

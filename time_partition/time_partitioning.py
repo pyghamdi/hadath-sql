@@ -33,7 +33,7 @@ def get_time_partition(
         Tuple of (interval_start, interval_end) representing the time interval
 
     Raises:
-        ValueError: If interval_length is invalid or shift_interval >= interval_length
+        ValueError: If interval_length is invalid or |shift_interval| >= interval_length
     """
     # Validate interval length (must be between 1 minute and 24 hours)
     if interval_length < timedelta(minutes=1) or interval_length > timedelta(hours=24):
@@ -55,8 +55,8 @@ def get_time_partition(
             )
     
     # Validate shift_interval
-    if shift_interval is not None and shift_interval >= interval_length:
-        raise ValueError("shift interval must be less than interval length")
+    if shift_interval is not None and abs(shift_interval) >= interval_length:
+        raise ValueError("shift interval magnitude must be less than interval length")
     
     # Calculate the start of the interval
     interval_total_seconds = int(interval_length.total_seconds())

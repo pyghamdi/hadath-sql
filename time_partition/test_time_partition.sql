@@ -28,6 +28,15 @@ SELECT hsql_time_partition(TIMESTAMP '2025-01-01 00:00:00', INTERVAL '15 minutes
 -- Test interval shift greater than period. Should raise exception
 SELECT hsql_time_partition(TIMESTAMP '2025-01-01 00:00:00', INTERVAL '15 minutes', INTERVAL '20 minutes');
 
+-- Test negative interval shift equal to period. Should raise exception
+SELECT hsql_time_partition(TIMESTAMP '2025-01-01 00:00:00', INTERVAL '15 minutes', INTERVAL '-15 minutes');
+
+-- Test negative interval shift greater than period. Should raise exception
+SELECT hsql_time_partition(TIMESTAMP '2025-01-01 00:00:00', INTERVAL '15 minutes', INTERVAL '-20 minutes');
+
+-- Test valid negative interval shift. Should not raise exception
+SELECT hsql_time_partition(TIMESTAMP '2025-01-01 00:00:00', INTERVAL '15 minutes', INTERVAL '-10 minutes');
+
 -- Basic functionality tests
 SELECT hsql_time_partition(TIMESTAMP '2025-01-01 00:00:00', INTERVAL '15 minutes');
 
