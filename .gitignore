@@ -1,3 +1,6 @@
+# Local-only material: PostGIS comparison, evaluation scripts and results
+local/
+
 # macOS specific files
 .DS_Store
 

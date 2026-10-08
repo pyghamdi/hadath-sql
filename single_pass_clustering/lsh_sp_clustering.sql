@@ -64,9 +64,6 @@ Notes:
 ################################################################################
 */
 
-DROP FUNCTION IF EXISTS hsql_create_tbls_for_lsh_single_pass_clustering(text, text, text, boolean) CASCADE;
-DROP FUNCTION IF EXISTS hsql_lsh_single_pass_clustering(text, text, text, text, text, float, integer, boolean) CASCADE;
-
 
 /* ##############################################################################
 hsql_create_tbls_for_lsh_single_pass_clustering
@@ -219,6 +216,18 @@ Centroid update (running mean over the n documents already in the cluster):
   move it to a different LSH bucket.
 
 Returns: void
+
+Example:
+  -- Cluster docs(doc_id, txt, ts) in timestamp order with threshold 0.5 and
+  -- 16 hyperplanes
+  SELECT hsql_lsh_single_pass_clustering('docs', 'doc_id', 'txt', 'ts',
+                                         'doc_clusters_lsh', 0.5, 16, TRUE);
+
+  -- Clusters and their sizes
+  SELECT cid, doc_count FROM doc_clusters_lsh ORDER BY doc_count DESC;
+
+  -- Cluster of each document
+  SELECT doc_id, cid FROM doc_clusters_lsh_cluster_assignments;
 
 Notes:
   - The signature is stored on the cluster row and indexed, so the candidate

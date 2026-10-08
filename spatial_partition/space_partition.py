@@ -1,3 +1,4 @@
+import math
 from pyproj import Transformer
 from typing import Tuple
 
@@ -28,36 +29,37 @@ def transform_to_mercator(longitude: float, latitude: float):
     return x, y
 
 
-def get_spatial_partition(x: float, y: float, cell_length: int) -> Tuple[int, int]:
+def get_spatial_partition(
+    x: float, y: float, cell_length: float, s_x: float = 0.0, s_y: float = 0.0
+) -> Tuple[int, int]:
     """
     Get the spatial partition (grid cell coordinates) for given x and y coordinates in mercator projection.
-    
-    This function divides the Web Mercator projection into a regular grid and returns the grid cell
-    coordinates for the given point. The grid starts at the Web Mercator projection bounds.
+
+    This function divides the Web Mercator plane into a regular grid and returns the grid cell
+    coordinates for the given point. The grid starts at the origin (0, 0) of the Web Mercator
+    coordinate system, as in hsql_spatial_partition.
 
     Args:
         x (float): x coordinate in mercator projection (meters)
         y (float): y coordinate in mercator projection (meters)
-        cell_length (int): Length of each grid cell in meters
+        cell_length (float): Length of each grid cell in meters
+        s_x (float): Shift of the grid along the x axis in meters (default 0)
+        s_y (float): Shift of the grid along the y axis in meters (default 0)
 
     Returns:
         Tuple[int, int]: (x_cell, y_cell) coordinates of the grid cell
-        
-    Note:
-        The grid origin is at (-20037508, -20037508) which corresponds to the
-        Web Mercator projection bounds. Cell coordinates start from (0, 0).
-    """
-    # Web Mercator projection bounds (in meters)
-    # These are the standard bounds for EPSG:3857 projection
-    x_min = -20037508.34
-    y_min = -20037508.34
 
-    # Convert to cell coordinates using integer division
-    x_cell = int((x - x_min) / cell_length)
-    y_cell = int((y - y_min) / cell_length)
-    
-    
-    return x_cell, y_cell 
+    Note:
+        Cell coordinates are negative west of the prime meridian and south of the
+        equator. The input coordinates are assumed to be valid; they are not checked.
+    """
+    # floor, not int(): int() truncates toward zero and would merge the cells
+    # on both sides of the origin.
+    x_cell = math.floor((x - s_x) / cell_length)
+    y_cell = math.floor((y - s_y) / cell_length)
+
+    return x_cell, y_cell
+
 
 if __name__ == "__main__":
     # Example usage and testing

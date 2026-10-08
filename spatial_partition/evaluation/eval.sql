@@ -49,8 +49,12 @@
 \echo '    max_rows=' :max_rows ', step_rows=' :step_rows
 \echo '    recreate_data=' :recreate_data
 
--- Ensure the UDF exists (idempotent when install.sql was already run).
+-- Load the module only when it is not installed yet. The module files create
+-- their objects without dropping existing ones, so loading one twice fails.
+SELECT NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'hsql_spatial_partition') AS hsql_missing \gset
+\if :hsql_missing
 \ir ../space_partition.sql
+\endif
 
 \if :recreate_data
 \echo '>>> creating benchmark table:' :source_tbl '(' :max_rows ' rows)'

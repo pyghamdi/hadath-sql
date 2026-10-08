@@ -28,7 +28,8 @@ FROM (
 )
 GROUP BY hsql_spatial_partition;
 
-SELECT 'Riyadh' as city, (5195870.62 - -20037508.34) / 500000::integer as x, (2810613.91 - -20037508.34) / 500000::integer as y;
+-- Manual check of the cell formula (grid origin at (0, 0)): expected (10, 5)
+SELECT 'Riyadh' as city, floor(5195870.62 / 500000) as x, floor(2840607.62 / 500000) as y;
 
 -- Shifted grid examples (shifts are in meters)
 SELECT 'Makkah_shift_x25km_y-25km' AS City, *
@@ -44,10 +45,13 @@ FROM hsql_spatial_partition(
 SELECT 'Makkah_shift_x25km' AS City, *
 FROM hsql_spatial_partition(4433432.304231072, 2442329.093011221, 50000, 25000);
 
--- 1-km cells, unshifted and shifted by 500 m: expected (24400, 22487) and (24399, 22486)
-SELECT 'Jeddah_1km' AS City, * FROM hsql_spatial_partition(4362889.14, 2449900.22, 1000)
+-- 1-km cells, unshifted and shifted by 500 m: expected (4433, 2442) and (4432, 2441)
+SELECT 'Makkah_1km' AS City, * FROM hsql_spatial_partition(4433432.30, 2442329.09, 1000)
 UNION ALL
-SELECT 'Jeddah_1km_shift_500m' AS City, * FROM hsql_spatial_partition(4362889.14, 2449900.22, 1000, 500, 500);
+SELECT 'Makkah_1km_shift_500m' AS City, * FROM hsql_spatial_partition(4433432.30, 2442329.09, 1000, 500, 500);
+
+-- Cells west of the prime meridian and south of the equator have negative indices: expected (-52, -27)
+SELECT 'Sao_Paulo_100km' AS City, * FROM hsql_spatial_partition(-5191324.26, -2698929.26, 100000);
 
 
 -- Time the following SQL statement using EXPLAIN ANALYZE to measure execution time

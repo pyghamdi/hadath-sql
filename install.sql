@@ -1,12 +1,16 @@
--- Install HadathDB UDFs, UDAs, and custom types in dependency order.
+-- Install HadathSQL UDFs, UDAs, and custom types in dependency order.
 --
 -- Loads:
 --   1) util helpers (e.g. hsql_table_exists_any_schema)
---   2) TF-IDF core UDFs and `tfidf_weight` type (`hsql_*` table builders in tf_idf.sql)
+--   2) TF-IDF UDFs (hsql_process_text, hsql_create_tf_idf_tbl)
 --   3) Aggregate UDAs: hsql_count_shared_terms, hsql_entropy (agg_funcs/)
---   4) Temporal partitioning (`hsql_time_partition`, `time_partition_id`)
---   5) Spatial partitioning (`hsql_spatial_partition`, `hsql_py_spatial_partition`, `spatial_partition_id`)
---   6) Single-pass clustering (`hsql_*` in single_pass_clustering/sp_clustering.sql)
+--   4) Temporal partitioning (hsql_time_partition, time_partition_id)
+--   5) Spatial partitioning (hsql_spatial_partition, spatial_partition_id)
+--   6) Single-pass clustering and its LSH variant (single_pass_clustering/)
+--
+-- The script is meant for a database that does not contain HadathSQL yet: it
+-- creates the objects and does not drop existing ones, so running it a second
+-- time on the same database fails on the types and aggregates that already exist.
 --
 -- This file uses psql meta-commands (\ir, \echo). Run it with psql from the
 -- repository root, for example:

@@ -24,7 +24,7 @@ From the **repository root**, run:
 psql -v ON_ERROR_STOP=1 -d hadathdb -f install.sql
 ```
 
-Replace `hadathdb` with your database name. The script is idempotent: each module drops and recreates its own objects, so re-running is safe when definitions change.
+Replace `hadathdb` with your database name. The script expects a database that does not contain HadathSQL yet: it creates the objects without dropping existing ones, so running it a second time on the same database fails on the types and aggregates that already exist. To reinstall, use a new database.
 
 `install.sql` loads everything in dependency order:
 
@@ -51,7 +51,7 @@ These are **not** part of `install.sql` but can be loaded separately when needed
 ## Repository layout
 
 ```
-hadathdb/
+hadath-sql/
 ├── install.sql                 # One-shot install for all core functions
 ├── util/                       # Shared SQL helpers
 ├── tf_idf/                     # TF-IDF UDFs, Python reference, evals, tests
@@ -80,11 +80,27 @@ SELECT hsql_single_pass_clustering(
 );
 ```
 
-**Partition a timestamp** into fixed windows:
+**Group documents by time interval and grid cell** (coordinates in Web Mercator, EPSG:3857):
 
 ```sql
-SELECT hsql_time_partition(ts, interval '1 hour');
+SELECT hsql_time_partition(ts, interval '1 hour') AS period,
+       hsql_spatial_partition(x, y, 1000) AS cell,
+       COUNT(*)
+FROM docs
+GROUP BY period, cell;
 ```
+
+**Score candidate events** with the aggregates:
+
+```sql
+SELECT event_id,
+       hsql_entropy(txt) AS word_entropy,
+       hsql_count_shared_terms(txt, 2) AS shared_term_count
+FROM candidate_events
+GROUP BY event_id;
+```
+
+Each module file starts with a comment block that documents its functions, their parameters, and examples.
 
 See module-specific `demo.sql`, `test_*.sql`, and `evaluation/eval.sql` files for fuller workflows.
 

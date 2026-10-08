@@ -2,34 +2,50 @@
 ################################################################################
 entropy aggregate (entropy.sql)
 ################################################################################
-Aggregates for per-event (GROUP BY) text analytics.
-
 Defines:
-  - hsql_entropy(txt) — event word entropy H(W) (base 2)
+  hsql_entropy(txt text) RETURNS double precision
 
-  H(W) = -sum_{i=1}^{V} P(w_i) log_2 P(w_i)
-  where P(w_i) = count(w_i) / total word count in the group.
+For a group of rows, returns the word entropy of their text, in bits. All text
+values of the group are pooled into one bag of words, and the entropy is
 
-Tokenization: whitespace split, no stemming; words are counted as-is.
-Parallel aggregation uses COMBINEFUNC (hsql_entropy_combine).
+  H(W) = -sum_i P(w_i) * log2(P(w_i)),
+  where P(w_i) = (occurrences of word w_i) / (total number of words in the group).
 
-Demo:
-  psql -f agg_funcs/demo_entropy.sql
-  -- hsql_entropy('cat hat cat bat') => 1.5
+Low entropy means that the group repeats a few words, which is typical of spam
+and duplicated posts; it is used to move such candidate events down a ranking.
+
+Parameters:
+  txt  - Text of one row (NULL is treated as empty text).
+
+Words are obtained by splitting the text on whitespace. They are not stemmed
+or lowercased, so `Fire` and `fire` are different words. A group with no words
+returns 0.
+
+Examples:
+  -- Returns 1.5 (cat = 2, hat = 1, bat = 1 out of 4 words)
+  SELECT hsql_entropy(txt) FROM (VALUES ('cat hat cat bat')) AS v(txt);
+
+  -- Rank events: those with entropy of at least 3.5 first, then by number of users
+  SELECT event_id,
+         hsql_entropy(txt) AS word_entropy,
+         COUNT(DISTINCT username) AS user_count
+  FROM candidate_events
+  GROUP BY event_id
+  ORDER BY CASE WHEN hsql_entropy(txt) >= 3.5 THEN 1 ELSE 0 END DESC,
+           COUNT(DISTINCT username) DESC;
+
+  More examples are in demo_entropy.sql in this directory.
+
+Implementation:
+  The aggregate state is a JSONB map from each word to its number of
+  occurrences. A combine function (hsql_entropy_combine) is defined for partial
+  aggregation, but the aggregate is not declared PARALLEL = SAFE, so PostgreSQL
+  does not use it in parallel plans.
 ################################################################################
 */
 
-DROP AGGREGATE IF EXISTS entropy(text);
-DROP FUNCTION IF EXISTS entropy_combine(jsonb, jsonb);
-DROP FUNCTION IF EXISTS entropy_final(jsonb);
-DROP FUNCTION IF EXISTS entropy_sfunc(jsonb, text);
 
-DROP AGGREGATE IF EXISTS hsql_entropy(text);
-DROP FUNCTION IF EXISTS hsql_entropy_combine(jsonb, jsonb);
-DROP FUNCTION IF EXISTS hsql_entropy_final(jsonb);
-DROP FUNCTION IF EXISTS hsql_entropy_sfunc(jsonb, text);
-
-
+-- Transition function: adds the word counts of `txt` to the state.
 CREATE OR REPLACE FUNCTION hsql_entropy_sfunc(state jsonb, txt text)
 RETURNS jsonb
 LANGUAGE sql
@@ -58,6 +74,7 @@ AS $$
 $$;
 
 
+-- Combine function: merges two partial states by adding the counts of matching words.
 CREATE OR REPLACE FUNCTION hsql_entropy_combine(state1 jsonb, state2 jsonb)
 RETURNS jsonb
 LANGUAGE sql
@@ -88,6 +105,7 @@ AS $$
 $$;
 
 
+-- Final function: computes the entropy from the word counts.
 CREATE OR REPLACE FUNCTION hsql_entropy_final(state jsonb)
 RETURNS double precision
 LANGUAGE sql

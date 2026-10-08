@@ -1,7 +1,10 @@
 -- #########################################################
 -- Demo: word entropy (plain SQL)
 --
--- Prerequisite: install the hsql_entropy aggregate first (run entropy.sql once).
+-- Prerequisite: HadathSQL is installed (install.sql), or at least entropy.sql is loaded.
+--
+-- Run (from repository root):
+--   psql -d <database> -f agg_funcs/demo_entropy.sql
 --
 -- Token counts for "cat hat cat bat" (whitespace split, as-is):
 --   cat = 2, hat = 1, bat = 1  (4 tokens, V = 3)
@@ -9,12 +12,12 @@
 --   H(W) = -(0.5*log2(0.5) + 0.25*log2(0.25) + 0.25*log2(0.25)) = 1.5
 -- #########################################################
 
--- Entropy value for one sample
+-- Entropy of two rows pooled into one bag of words:
+-- cat = 2, hat = 1, bat = 1, so H(W) = 1.5
 SELECT hsql_entropy(txt) AS entropy_bits
--- FROM (VALUES ('cat hat cat bat')) AS v(txt);
 FROM (
     VALUES 
-    ('cat hat')
+    ('cat hat'),
     ('cat bat')
 ) AS v(txt);
 

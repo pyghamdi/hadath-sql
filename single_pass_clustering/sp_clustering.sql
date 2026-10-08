@@ -36,9 +36,6 @@ Dependencies:
 ################################################################################
 */
 
-DROP FUNCTION IF EXISTS hsql_create_tbls_for_single_pass_clustering(text, text, text, boolean) CASCADE;
-DROP FUNCTION IF EXISTS hsql_single_pass_clustering(text, text, text, text, text, float, boolean) CASCADE;
-
 
 /* ##############################################################################
 hsql_create_tbls_for_single_pass_clustering
@@ -168,6 +165,19 @@ Centroid update (running mean over the n documents already in the cluster):
   weight is 0 are removed from the centroid.
 
 Returns: void
+
+Example:
+  -- Cluster docs(doc_id, txt, ts) in timestamp order with threshold 0.5
+  SELECT hsql_single_pass_clustering('docs', 'doc_id', 'txt', 'ts',
+                                     'doc_clusters', 0.5, TRUE);
+
+  -- Clusters and their sizes
+  SELECT cid, doc_count FROM doc_clusters ORDER BY doc_count DESC;
+
+  -- Cluster of each document
+  SELECT doc_id, cid FROM doc_clusters_cluster_assignments;
+
+  A runnable example is in demo.sql in this directory.
 
 Notes:
   - All dynamic SQL is formatted once before the main loop; per-iteration cost

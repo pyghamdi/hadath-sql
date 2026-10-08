@@ -15,7 +15,8 @@
 --
 -- FLOW
 --   1) Ensure db_name exists
---   2) Load tf_idf/tf_idf.sql (hsql_process_text) and agg_funcs/count_shared_terms.sql
+--   2) Load tf_idf/tf_idf.sql (hsql_process_text) and, unless the aggregate is
+--      already installed in db_name, agg_funcs/count_shared_terms.sql
 --   3) Run hsql_count_shared_terms cases; raise if any got != want
 -- #########################################################
 
@@ -70,7 +71,12 @@ WHERE NOT EXISTS (
 \ir ../../tf_idf/tf_idf.sql
 
 \echo '>>> agg_funcs/count_shared_terms.sql'
+-- Load the module only when it is not installed yet. The module files create
+-- their objects without dropping existing ones, so loading one twice fails.
+SELECT NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'hsql_count_shared_terms') AS hsql_missing \gset
+\if :hsql_missing
 \ir ../count_shared_terms.sql
+\endif
 
 \echo '>>> running count_shared_terms tests'
 

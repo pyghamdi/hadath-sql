@@ -6,23 +6,28 @@ This script defines reusable PostgreSQL UDFs for:
   - tokenizing text into `(term, count)` pairs (`hsql_process_text`)
   - building a full TF-IDF output table (`hsql_create_tf_idf_tbl`)
 
-Expected text preprocessing is PostgreSQL English stemming via `to_tsvector('english', ...)`.
-The main output table schema created by `hsql_create_tf_idf_tbl` is:
+Text is preprocessed with PostgreSQL full-text search, `to_tsvector('english', ...)`,
+which lowercases the text, removes English stop words, and stems the remaining words.
+The output table created by `hsql_create_tf_idf_tbl` has the schema
   `(doc_id INTEGER, term TEXT, weight FLOAT)`.
+
+Examples:
+  -- Terms of one text: returns (fire, 2) and (downtown, 1)
+  SELECT * FROM hsql_process_text('Fires and a fire downtown');
+
+  -- Build the table docs_tfidf from docs(doc_id, txt), replacing it if it exists
+  SELECT hsql_create_tf_idf_tbl('docs', 'doc_id', 'txt', 'docs_tfidf', TRUE);
+  SELECT * FROM docs_tfidf ORDER BY doc_id, weight DESC;
 ################################################################################
 */
-
--- Drop only objects defined in this script (ensures clean re-run)
-DROP FUNCTION IF EXISTS hsql_process_text(text) CASCADE;
-DROP FUNCTION IF EXISTS hsql_create_tf_idf_tbl(text, text, text, text, boolean) CASCADE;
 
 
 /* ################################################################################
 hsql_process_text
 --------------------------------------------------------------------------------
-Converts one text value into a normalized bag-of-terms representation.
-Internally uses PostgreSQL full-text tokenization (`to_tsvector`) with
-English stemming, then converts the token stream into `(term, count)` rows.
+Converts one text value into its terms and the number of times each term occurs.
+Uses PostgreSQL full-text tokenization (`to_tsvector`) with the English
+configuration, so stop words are removed and the remaining words are stemmed.
 
 Parameters:
   input - Document text to tokenize (NULL is treated as empty text)
@@ -30,7 +35,10 @@ Parameters:
 Returns: TABLE(term text, count integer)
 
 Notes:
-  - Output has one row per unique normalized term in `input`
+  - Output has one row per distinct term of `input`
+  - Call it in FROM, for example with a lateral join:
+      SELECT d.doc_id, t.term, t.count
+      FROM docs AS d CROSS JOIN LATERAL hsql_process_text(d.txt) AS t;
   - Marked `STABLE` and `PARALLEL SAFE`
 ################################################################################ */
 CREATE OR REPLACE FUNCTION hsql_process_text(
@@ -54,18 +62,21 @@ AS $$
 $$ LANGUAGE SQL STABLE PARALLEL SAFE;
 
 
-
 /* ################################################################################
 hsql_create_tf_idf_tbl
 --------------------------------------------------------------------------------
 Builds a TF-IDF output table from a source document table.
 
 Parameters:
-  input_tbl             - Source corpus table
-  doc_id_col            - Column name for unique document id
-  text_col              - Column name containing document text
-  output_tbl            - Output table name `(doc_id, term, weight)`
-  overwrite_output_tbl  - If TRUE, drop/recreate output table when it exists
+  input_tbl             - Name of the source table, one row per document
+  doc_id_col            - Name of the column with the unique document id (INTEGER)
+  text_col              - Name of the column with the document text
+  output_tbl            - Name of the table to create, `(doc_id, term, weight)`
+  overwrite_output_tbl  - If TRUE, drop and recreate the output table when it
+                          already exists; if FALSE (the default), raise an error
+
+Example:
+  SELECT hsql_create_tf_idf_tbl('docs', 'doc_id', 'txt', 'docs_tfidf', TRUE);
 
 Steps:
   1. Process documents to extract terms and counts via hsql_process_text
@@ -77,6 +88,7 @@ Returns:
 
 Formula:
   weight = (term_count_in_doc / total_terms_in_doc) * LOG(total_docs / docs_with_term)
+  LOG is the base-10 logarithm. A term that occurs in every document gets weight 0.
 ################################################################################ */
 CREATE OR REPLACE FUNCTION hsql_create_tf_idf_tbl(
     input_tbl text,

@@ -2,40 +2,46 @@
 ################################################################################
 count_shared_terms aggregate (count_shared_terms.sql)
 ################################################################################
-Aggregates for per-event (GROUP BY) text analytics.
-
 Defines:
-  - hsql_count_shared_terms(txt, minimum) — count of terms appearing in at least
-    `minimum` tuples within the group
+  hsql_count_shared_terms(txt text, minimum integer) RETURNS integer
 
-A shared term is one that appears in >= `minimum` distinct tuples
-(rows) in the aggregate group. Tokenization matches hsql_process_text
-(English stemming via to_tsvector).
+For a group of rows, returns the number of shared terms. A shared term is a
+term that appears in at least `minimum` rows of the group; repeating a term
+inside one row counts once. It is used to keep candidate events whose
+documents mention the same terms.
 
-Parallel aggregation uses COMBINEFUNC (hsql_count_shared_terms_combine) to sum
-per-term tuple counts across partial states.
+Parameters:
+  txt      - Text of one row (NULL is treated as empty text).
+  minimum  - Number of rows a term must appear in to be counted. Pass the same
+             value for every row of a group, typically a constant.
+
+Terms are extracted with hsql_process_text (tf_idf/tf_idf.sql), which applies
+PostgreSQL English stemming and removes stop words, so that file must be
+loaded first. An empty group returns 0.
+
+Example:
+  -- Keep the events reported by more than 2 users that have at least 3 terms
+  -- shared by 2 or more documents.
+  SELECT event_id,
+         COUNT(DISTINCT username) AS user_count,
+         hsql_count_shared_terms(txt, 2) AS shared_term_count
+  FROM candidate_events
+  GROUP BY event_id
+  HAVING COUNT(DISTINCT username) > 2
+     AND hsql_count_shared_terms(txt, 2) >= 3;
+
+Implementation:
+  The aggregate state is a JSONB map from each term to the number of rows it
+  appears in, plus the key `__minimum__` that carries the threshold to the
+  final function. A combine function (hsql_count_shared_terms_combine) is
+  defined for partial aggregation, but the aggregate is not declared
+  PARALLEL = SAFE, so PostgreSQL does not use it in parallel plans.
 ################################################################################
 */
 
-DROP AGGREGATE IF EXISTS co_occur_term(text, integer);
-DROP FUNCTION IF EXISTS co_occur_term_final(jsonb);
-DROP FUNCTION IF EXISTS co_occur_term_sfunc(jsonb, text, integer);
 
-DROP AGGREGATE IF EXISTS count_recurrent_terms(text, integer);
-DROP FUNCTION IF EXISTS count_recurrent_terms_final(jsonb);
-DROP FUNCTION IF EXISTS count_recurrent_terms_sfunc(jsonb, text, integer);
-
-DROP AGGREGATE IF EXISTS count_shared_terms(text, integer);
-DROP FUNCTION IF EXISTS count_shared_terms_combine(jsonb, jsonb);
-DROP FUNCTION IF EXISTS count_shared_terms_final(jsonb);
-DROP FUNCTION IF EXISTS count_shared_terms_sfunc(jsonb, text, integer);
-
-DROP AGGREGATE IF EXISTS hsql_count_shared_terms(text, integer);
-DROP FUNCTION IF EXISTS hsql_count_shared_terms_combine(jsonb, jsonb);
-DROP FUNCTION IF EXISTS hsql_count_shared_terms_final(jsonb);
-DROP FUNCTION IF EXISTS hsql_count_shared_terms_sfunc(jsonb, text, integer);
-
-
+-- Transition function: adds 1 to the row count of every distinct term of `txt`
+-- and records `minimum` in the state.
 CREATE OR REPLACE FUNCTION hsql_count_shared_terms_sfunc(state jsonb, txt text, minimum integer)
 RETURNS jsonb
 LANGUAGE sql
@@ -62,6 +68,8 @@ AS $$
 $$;
 
 
+-- Combine function: merges two partial states by adding the row counts of
+-- matching terms.
 CREATE OR REPLACE FUNCTION hsql_count_shared_terms_combine(state1 jsonb, state2 jsonb)
 RETURNS jsonb
 LANGUAGE sql
@@ -102,6 +110,7 @@ AS $$
 $$;
 
 
+-- Final function: counts the terms whose row count is at least the threshold.
 CREATE OR REPLACE FUNCTION hsql_count_shared_terms_final(state jsonb)
 RETURNS integer
 LANGUAGE sql
