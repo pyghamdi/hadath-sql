@@ -32,8 +32,8 @@ Replace `hadathdb` with your database name. The script expects a database that d
 |------|--------|------------------|
 | 1 | `util/table_utils.sql` | Shared helpers (`hsql_table_exists_any_schema`, …) |
 | 2 | `tf_idf/tf_idf.sql` | Text tokenization and TF-IDF table builders (`hsql_process_text`, `hsql_create_tf_idf_tbl`) |
-| 3 | `agg_funcs/count_shared_terms.sql` | `hsql_count_shared_terms` aggregate |
-| 4 | `agg_funcs/entropy.sql` | `hsql_entropy` aggregate |
+| 3 | `agg_funcs/count_shared_terms.sql` | `hsql_count_shared_terms` aggregate, for `text` and for `tsvector` input |
+| 4 | `agg_funcs/entropy.sql` | `hsql_entropy` aggregate, for `text` and for `tsvector` input |
 | 5 | `time_partition/time_partitioning.sql` | `time_partition_id` type and `hsql_time_partition()` |
 | 6 | `spatial_partition/space_partition.sql` | `spatial_partition_id` type and `hsql_spatial_partition()` |
 | 7 | `single_pass_clustering/sp_clustering.sql` | Single-pass clustering with built-in TF-IDF |
@@ -46,6 +46,7 @@ Replace `hadathdb` with your database name. The script expects a database that d
 These are **not** part of `install.sql` but can be loaded separately when needed:
 
 - `tf_idf/iterative/tf_idf_itr.sql` — iterative TF-IDF builder (`hsql_create_tf_idf_tbl_itr`)
+- `cfunc/` — `hadathsql_c`, a C extension with `hsql_entropy_c` and `hsql_count_shared_terms_c`, C implementations of the two aggregates. They are faster, use less memory on large groups, and count terms in parallel workers, but they have to be compiled and installed on the database server, so they are not available where extensions cannot be installed, such as most managed PostgreSQL services. The SQL aggregates `hsql_entropy` and `hsql_count_shared_terms` need no compilation and remain available next to them. See [`cfunc/README.md`](cfunc/README.md).
 - Individual demo and test scripts under each module directory
 
 ## Repository layout
@@ -60,7 +61,7 @@ hadath-sql/
 ├── spatial_partition/          # Web Mercator spatial grid partitioning
 ├── single_pass_clustering/     # Leader clustering (+ LSH variant)
 ├── dataset/                    # Sample corpora and loaders (see dataset/README.md)
-└── cfunc/                      # C extension experiments (not used by install.sql)
+└── cfunc/                      # Optional C extension with the aggregates in C (see cfunc/README.md)
 ```
 
 ## Quick examples
@@ -94,7 +95,7 @@ GROUP BY period, cell;
 
 ```sql
 SELECT event_id,
-       hsql_entropy(txt) AS word_entropy,
+       hsql_entropy(txt) AS term_entropy,
        hsql_count_shared_terms(txt, 2) AS shared_term_count
 FROM candidate_events
 GROUP BY event_id;
@@ -114,6 +115,7 @@ psql -d hsql_test -f tf_idf/tests/test_sql_vs_python_parity.sql
 
 # Aggregate function tests
 psql -d hadathdb -f agg_funcs/tests/test_count_shared_terms.sql
+psql -d hadathdb -f agg_funcs/tests/test_entropy.sql
 
 # Runtime benchmarks (may require Python eval data scripts first)
 psql -d hadathdb -f tf_idf/eval/eval.sql

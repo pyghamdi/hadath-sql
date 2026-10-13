@@ -1,0 +1,5 @@
+# hadathsql_c extension
+comment = 'HadathSQL aggregates implemented in C (hsql_entropy_c, hsql_count_shared_terms_c)'
+default_version = '1.0'
+module_pathname = '$libdir/hadathsql_c'
+relocatable = true

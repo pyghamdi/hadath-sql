@@ -1,76 +1,30 @@
 -- #########################################################
--- Tests for hsql_count_shared_terms(txt, minimum) aggregate (agg_funcs/count_shared_terms.sql).
+-- Tests for the hsql_count_shared_terms(text, integer) and
+-- hsql_count_shared_terms(tsvector, integer) aggregates
+-- (agg_funcs/count_shared_terms.sql).
 --
 -- HOW TO RUN (from repository root):
 --
---   PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U postgres \
---     -d postgres -f agg_funcs/tests/test_count_shared_terms.sql
---
--- Override connection defaults with psql -v:
---   db_host, db_port, db_name, db_user, db_password, db_admin_name
+--   psql -v ON_ERROR_STOP=1 -d <database> -f agg_funcs/tests/test_count_shared_terms.sql
 --
 -- PREREQUISITES
---   - Role can connect to db_name (created if missing, like tf_idf parity tests).
---   - English full-text config available (to_tsvector('english', ...)).
+--   - HadathSQL is installed in the database (install.sql). If
+--     hsql_count_shared_terms is missing, this script loads
+--     agg_funcs/count_shared_terms.sql.
+--   - English full-text configuration is available (to_tsvector('english', ...)).
 --
 -- FLOW
---   1) Ensure db_name exists
---   2) Load tf_idf/tf_idf.sql (hsql_process_text) and, unless the aggregate is
---      already installed in db_name, agg_funcs/count_shared_terms.sql
---   3) Run hsql_count_shared_terms cases; raise if any got != want
+--   1) Compare the aggregates with the expected value on small groups.
+--   2) Compute the aggregates on a generated table in a serial plan and in a
+--      parallel plan, and check that the parallel plan is used and returns
+--      the same values as a serial plan.
+--   The script raises an error if any check fails. It creates temporary tables
+--   and one regular table, _shared_terms_test_docs, which it drops at the end (a
+--   parallel plan cannot scan a temporary table).
 -- #########################################################
 
 \set ON_ERROR_STOP on
 
-\if :{?db_host}
-\else
-\set db_host 127.0.0.1
-\endif
-
-\if :{?db_port}
-\else
-\set db_port 5432
-\endif
-
-\if :{?db_name}
-\else
-\set db_name hsql_test
-\endif
-
-\if :{?db_user}
-\else
-\set db_user postgres
-\endif
-
-\if :{?db_password}
-\else
-\set db_password postgres
-\endif
-
-\if :{?db_admin_name}
-\else
-\set db_admin_name postgres
-\endif
-
-\setenv PGHOST :db_host
-\setenv PGPORT :db_port
-\setenv PGUSER :db_user
-\setenv PGPASSWORD :db_password
-
-\echo '>>> ensuring database exists: ' :db_name
-\connect :db_admin_name
-SELECT format('CREATE DATABASE %I', :'db_name')
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM pg_database
-    WHERE datname = :'db_name'
-)\gexec
-\connect :db_name
-
-\echo '>>> tf_idf/tf_idf.sql (hsql_process_text)'
-\ir ../../tf_idf/tf_idf.sql
-
-\echo '>>> agg_funcs/count_shared_terms.sql'
 -- Load the module only when it is not installed yet. The module files create
 -- their objects without dropping existing ones, so loading one twice fails.
 SELECT NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'hsql_count_shared_terms') AS hsql_missing \gset
@@ -78,152 +32,202 @@ SELECT NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'hsql_count_shared_term
 \ir ../count_shared_terms.sql
 \endif
 
-\echo '>>> running count_shared_terms tests'
+\echo '>>> running hsql_count_shared_terms tests'
 
-DROP TABLE IF EXISTS _count_shared_terms_test_results;
-CREATE TEMP TABLE _count_shared_terms_test_results (
+CREATE TEMP TABLE _shared_terms_test_results (
     test_id text PRIMARY KEY,
     want integer NOT NULL,
     got integer
 );
 
-INSERT INTO _count_shared_terms_test_results (test_id, want, got) VALUES
+INSERT INTO _shared_terms_test_results (test_id, want, got) VALUES
     (
-        'three_terms_three_tuples_min3',
+        'three_terms_in_three_rows_min3',
         3,
         (SELECT hsql_count_shared_terms(txt, 3)
-         FROM (VALUES
-             ('apple banana cherry'),
-             ('apple banana cherry'),
-             ('apple banana cherry')
-         ) AS v(txt))
+         FROM (VALUES ('apple banana cherry'), ('apple banana cherry'), ('apple banana cherry')) AS v(txt))
     ),
     (
-        'two_tuples_below_min3',
+        'two_rows_below_min3',
         0,
         (SELECT hsql_count_shared_terms(txt, 3)
-         FROM (VALUES
-             ('apple banana cherry'),
-             ('apple banana cherry')
-         ) AS v(txt))
+         FROM (VALUES ('apple banana cherry'), ('apple banana cherry')) AS v(txt))
     ),
     (
         'three_shared_terms_min2_mixed_rows',
         3,
         (SELECT hsql_count_shared_terms(txt, 2)
-         FROM (VALUES
-             ('apple banana cherry'),
-             ('apple banana cherry'),
-             ('dog elephant')
-         ) AS v(txt))
+         FROM (VALUES ('apple banana cherry'), ('apple banana cherry'), ('dog elephant')) AS v(txt))
+    ),
+    (
+        -- A term repeated inside one row counts once for that row.
+        'repeated_term_counts_once_per_row',
+        1,
+        (SELECT hsql_count_shared_terms(txt, 2) FROM (VALUES ('apple apple apple'), ('apple apple')) AS v(txt))
+    ),
+    (
+        'repeated_term_in_a_single_row_is_not_shared',
+        0,
+        (SELECT hsql_count_shared_terms(txt, 2) FROM (VALUES ('apple apple apple'), ('banana')) AS v(txt))
+    ),
+    (
+        'one_shared_term_among_three_rows',
+        1,
+        (SELECT hsql_count_shared_terms(txt, 2)
+         FROM (VALUES ('apple apple apple'), ('apple banana'), ('apple cherry')) AS v(txt))
+    ),
+    (
+        -- Fire, fire, and fires are the same term; "the" is a stop word.
+        'terms_are_normalized',
+        1,
+        (SELECT hsql_count_shared_terms(txt, 3) FROM (VALUES ('The Fire'), ('the fires'), ('fire the')) AS v(txt))
+    ),
+    (
+        'minimum_one_counts_all_distinct_terms',
+        3,
+        (SELECT hsql_count_shared_terms(txt, 1) FROM (VALUES ('apple banana'), ('apple cherry')) AS v(txt))
+    ),
+    (
+        'null_and_empty_text_are_ignored',
+        1,
+        (SELECT hsql_count_shared_terms(txt, 2) FROM (VALUES ('apple'), (NULL::text), (''), ('apple')) AS v(txt))
+    ),
+    (
+        'only_null_and_empty_text',
+        0,
+        (SELECT hsql_count_shared_terms(txt, 1) FROM (VALUES (NULL::text), ('')) AS v(txt))
     ),
     (
         'empty_group',
         0,
-        (SELECT hsql_count_shared_terms(txt, 3)
-         FROM (SELECT NULL::text AS txt WHERE false) AS v)
+        (SELECT hsql_count_shared_terms(txt, 3) FROM (SELECT NULL::text AS txt WHERE false) AS v)
     ),
     (
-        'once_per_tuple_repeated_token',
-        1,
-        (SELECT hsql_count_shared_terms(txt, 2)
-         FROM (VALUES
-             ('apple apple apple'),
-             ('apple apple')
-         ) AS v(txt))
-    ),
-    (
-        'group_event1_min2',
-        1,
-        (SELECT hsql_count_shared_terms(txt, 2)
-         FROM (VALUES
-             ('apple apple apple'),
-             ('apple banana'),
-             ('apple cherry')
-         ) AS v(txt))
-    ),
-    (
-        'null_and_empty_text_ignored',
-        0,
-        (SELECT hsql_count_shared_terms(txt, 1)
-         FROM (VALUES
-             (NULL::text),
-             ('')
-         ) AS v(txt))
-    ),
-    (
-        'combine_merges_partial_states',
-        1,
-        (SELECT hsql_count_shared_terms_final(
-            hsql_count_shared_terms_combine(
-                '{"__minimum__": 2, "appl": 2, "banana": 1}'::jsonb,
-                '{"__minimum__": 2, "appl": 1, "cherri": 1}'::jsonb
-            )
-        ))
-    ),
-    (
-        'combine_matches_chained_sfunc',
+        'tsvector_three_shared_terms',
         3,
-        (SELECT hsql_count_shared_terms_final(
-            hsql_count_shared_terms_combine(
-                hsql_count_shared_terms_sfunc(
-                    hsql_count_shared_terms_sfunc('{}'::jsonb, 'apple banana cherry', 2),
-                    'apple banana cherry',
-                    2
-                ),
-                hsql_count_shared_terms_sfunc('{}'::jsonb, 'dog elephant', 2)
-            )
-        ))
+        (SELECT hsql_count_shared_terms(to_tsvector('english', txt), 2)
+         FROM (VALUES ('apple banana cherry'), ('apple banana cherry'), ('dog elephant')) AS v(txt))
+    ),
+    (
+        'tsvector_null_is_ignored',
+        1,
+        (SELECT hsql_count_shared_terms(to_tsvector('english', txt), 2)
+         FROM (VALUES ('apple apple'), (NULL::text), ('apple banana')) AS v(txt))
+    ),
+    (
+        'tsvector_empty_group',
+        0,
+        (SELECT hsql_count_shared_terms(tsv, 2) FROM (SELECT NULL::tsvector AS tsv WHERE false) AS v)
+    ),
+    (
+        -- The simple configuration keeps stop words: "the" is shared by both rows.
+        'tsvector_other_configuration',
+        1,
+        (SELECT hsql_count_shared_terms(to_tsvector('simple', txt), 2) FROM (VALUES ('the cat'), ('the dog')) AS v(txt))
+    )
+    ,
+    (
+        -- Merging two partial states gives the state of the whole group.
+        'combine_merges_partial_states',
+        3,
+        (SELECT hsql_count_shared_terms_final(hsql_count_shared_terms_combine(
+            ARRAY['2', 'apple banana cherry', 'apple banana cherry'],
+            ARRAY['2', 'dog elephant', 'cherry'])))
+    ),
+    (
+        'combine_with_an_empty_state',
+        1,
+        (SELECT hsql_count_shared_terms_final(hsql_count_shared_terms_combine(
+            '{}'::text[], ARRAY['2', 'apple', 'apple'])))
     );
 
-INSERT INTO _count_shared_terms_test_results (test_id, want, got)
-SELECT
-    'group_by_event_id_event' || event_id::text,
-    1,
-    shared_term_count
-FROM (
-    SELECT event_id, hsql_count_shared_terms(txt, 2) AS shared_term_count
-    FROM (VALUES
-        (1, 'apple apple apple'),
-        (1, 'apple banana'),
-        (1, 'apple cherry'),
-        (2, 'dog dog'),
-        (2, 'dog cat')
-    ) AS e(event_id, txt)
-    GROUP BY event_id
-) AS per_event;
-
--- Per-case results (for inspection)
-SELECT
-    test_id,
-    got,
-    want,
-    (got = want) AS ok
-FROM _count_shared_terms_test_results
-ORDER BY test_id;
-
--- Single PASS / FAIL row for automation
-SELECT CASE
-    WHEN EXISTS (
-        SELECT 1
-        FROM _count_shared_terms_test_results
-        WHERE got IS DISTINCT FROM want
-    ) THEN 'FAIL'
-    ELSE 'PASS'
-END AS count_shared_terms_tests;
+SELECT test_id, want, got
+FROM _shared_terms_test_results
+WHERE got IS DISTINCT FROM want;
 
 DO $$
+DECLARE
+    failed integer;
 BEGIN
-    IF EXISTS (
-        SELECT 1
-        FROM _count_shared_terms_test_results
-        WHERE got IS DISTINCT FROM want
-    ) THEN
-        RAISE EXCEPTION 'count_shared_terms tests failed (see per-case output above)';
+    SELECT COUNT(*) INTO failed
+    FROM _shared_terms_test_results
+    WHERE got IS DISTINCT FROM want;
+    IF failed > 0 THEN
+        RAISE EXCEPTION 'hsql_count_shared_terms: % value test(s) failed (see the rows above)', failed;
     END IF;
 END;
 $$;
 
-DROP TABLE _count_shared_terms_test_results;
+\echo '>>> running hsql_count_shared_terms serial and parallel test'
 
-\echo '>>> count_shared_terms tests passed'
+-- 20,000 rows in 20 groups; the words of a row depend on its group, so the
+-- groups have different numbers of shared terms.
+CREATE TABLE _shared_terms_test_docs AS
+SELECT g % 20 AS grp,
+       'word' || (g % (5 + g % 20)) || ' term' || (g % 997) || ' fire' AS txt
+FROM generate_series(1, 20000) AS g;
+ANALYZE _shared_terms_test_docs;
+
+SET max_parallel_workers_per_gather = 0;
+CREATE TEMP TABLE _shared_terms_test_reference AS
+SELECT grp, hsql_count_shared_terms(txt, 3) AS shared FROM _shared_terms_test_docs GROUP BY grp;
+
+DO $$
+DECLARE
+    queries text[] := ARRAY[
+        'SELECT grp, hsql_count_shared_terms(txt, 3) AS shared FROM _shared_terms_test_docs GROUP BY grp',
+        'SELECT grp, hsql_count_shared_terms(to_tsvector(''english'', txt), 3) AS shared FROM _shared_terms_test_docs GROUP BY grp'];
+    query text;
+    parallel boolean;
+    plan_line text;
+    plan_text text;
+    differing integer;
+    distinct_values integer;
+BEGIN
+    -- The reference must not be trivial: the groups have different results.
+    SELECT COUNT(DISTINCT shared) INTO distinct_values FROM _shared_terms_test_reference;
+    IF distinct_values < 2 THEN
+        RAISE EXCEPTION 'hsql_count_shared_terms: the generated groups all have the same result';
+    END IF;
+
+    FOREACH parallel IN ARRAY ARRAY[false, true] LOOP
+        IF parallel THEN
+            -- Make a parallel plan cheap enough to be chosen for this small table.
+            SET LOCAL max_parallel_workers_per_gather = 2;
+            SET LOCAL parallel_setup_cost = 0;
+            SET LOCAL parallel_tuple_cost = 0;
+            SET LOCAL min_parallel_table_scan_size = 0;
+            SET LOCAL enable_sort = off;
+        END IF;
+
+        FOREACH query IN ARRAY queries LOOP
+            IF parallel THEN
+                plan_text := '';
+                FOR plan_line IN EXECUTE 'EXPLAIN (COSTS OFF) ' || query LOOP
+                    plan_text := plan_text || plan_line || E'\n';
+                END LOOP;
+                IF plan_text NOT LIKE '%Partial%Aggregate%' THEN
+                    RAISE EXCEPTION E'hsql_count_shared_terms: expected a parallel (partial) aggregate for\n%\ngot the plan\n%',
+                        query, plan_text;
+                END IF;
+            END IF;
+
+            EXECUTE format(
+                'SELECT COUNT(*)
+                 FROM _shared_terms_test_reference AS r
+                 FULL JOIN (%s) AS c USING (grp)
+                 WHERE r.shared IS DISTINCT FROM c.shared',
+                query) INTO differing;
+            IF differing > 0 THEN
+                RAISE EXCEPTION E'hsql_count_shared_terms: % group(s) differ from the reference (parallel plan: %) for\n%',
+                    differing, parallel, query;
+            END IF;
+        END LOOP;
+    END LOOP;
+END;
+$$;
+
+RESET max_parallel_workers_per_gather;
+DROP TABLE _shared_terms_test_docs;
+
+\echo '>>> hsql_count_shared_terms tests passed'
