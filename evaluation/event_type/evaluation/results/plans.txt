@@ -1,0 +1,152 @@
+== kw_fraction=0.01  keyword_only
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: ((2 - length(ts_delete('''earthquak'':1 ''shake'':2'::tsvector, tsvector_to_array(to_tsvector('english'::regconfig, txt))))) > 0)
+
+
+== kw_fraction=0.01  classifier_only
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: hsql_event_type(to_tsvector('english'::regconfig, txt), 'earthquake'::text)
+
+
+== kw_fraction=0.01  two_udfs
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: (((2 - length(ts_delete('''earthquak'':1 ''shake'':2'::tsvector, tsvector_to_array(to_tsvector('english'::regconfig, txt))))) > 0) AND hsql_event_type(to_tsvector('english'::regconfig, txt), 'earthquake'::text))
+
+
+== kw_fraction=0.01  one_udf_inlined
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: (((2 - length(ts_delete('''earthquak'':1 ''shake'':2'::tsvector, tsvector_to_array(to_tsvector('english'::regconfig, txt))))) > 0) AND hsql_event_type(to_tsvector('english'::regconfig, txt), 'earthquake'::text))
+
+
+== kw_fraction=0.01  one_udf_plpgsql
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: hsql_event_type_eval_plpgsql(txt, 'earthquake'::text, '''earthquak'' | ''shake'''::tsquery)
+
+
+== kw_fraction=0.01  one_udf_sql
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: hsql_event_type_eval_sql(txt, 'earthquake'::text, '''earthquak'' | ''shake'''::tsquery)
+
+
+== kw_fraction=0.01  two_udfs_tsvector
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: (((2 - length(ts_delete('''earthquak'':1 ''shake'':2'::tsvector, tsvector_to_array(tsv)))) > 0) AND hsql_event_type(tsv, 'earthquake'::text))
+
+
+== kw_fraction=0.01  two_udfs_gin_index
+Aggregate
+  ->  Bitmap Heap Scan on event_type_eval_docs
+        Recheck Cond: (to_tsvector('english'::regconfig, txt) @@ '''earthquak'' | ''shake'''::tsquery)
+        Filter: hsql_event_type(to_tsvector('english'::regconfig, txt), 'earthquake'::text)
+        ->  Bitmap Index Scan on event_type_eval_docs_txt_idx
+              Index Cond: (to_tsvector('english'::regconfig, txt) @@ '''earthquak'' | ''shake'''::tsquery)
+
+
+== kw_fraction=0.1  keyword_only
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: ((2 - length(ts_delete('''earthquak'':1 ''shake'':2'::tsvector, tsvector_to_array(to_tsvector('english'::regconfig, txt))))) > 0)
+
+
+== kw_fraction=0.1  classifier_only
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: hsql_event_type(to_tsvector('english'::regconfig, txt), 'earthquake'::text)
+
+
+== kw_fraction=0.1  two_udfs
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: (((2 - length(ts_delete('''earthquak'':1 ''shake'':2'::tsvector, tsvector_to_array(to_tsvector('english'::regconfig, txt))))) > 0) AND hsql_event_type(to_tsvector('english'::regconfig, txt), 'earthquake'::text))
+
+
+== kw_fraction=0.1  one_udf_inlined
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: (((2 - length(ts_delete('''earthquak'':1 ''shake'':2'::tsvector, tsvector_to_array(to_tsvector('english'::regconfig, txt))))) > 0) AND hsql_event_type(to_tsvector('english'::regconfig, txt), 'earthquake'::text))
+
+
+== kw_fraction=0.1  one_udf_plpgsql
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: hsql_event_type_eval_plpgsql(txt, 'earthquake'::text, '''earthquak'' | ''shake'''::tsquery)
+
+
+== kw_fraction=0.1  one_udf_sql
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: hsql_event_type_eval_sql(txt, 'earthquake'::text, '''earthquak'' | ''shake'''::tsquery)
+
+
+== kw_fraction=0.1  two_udfs_tsvector
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: (((2 - length(ts_delete('''earthquak'':1 ''shake'':2'::tsvector, tsvector_to_array(tsv)))) > 0) AND hsql_event_type(tsv, 'earthquake'::text))
+
+
+== kw_fraction=0.1  two_udfs_gin_index
+Aggregate
+  ->  Bitmap Heap Scan on event_type_eval_docs
+        Recheck Cond: (to_tsvector('english'::regconfig, txt) @@ '''earthquak'' | ''shake'''::tsquery)
+        Filter: hsql_event_type(to_tsvector('english'::regconfig, txt), 'earthquake'::text)
+        ->  Bitmap Index Scan on event_type_eval_docs_txt_idx
+              Index Cond: (to_tsvector('english'::regconfig, txt) @@ '''earthquak'' | ''shake'''::tsquery)
+
+
+== kw_fraction=0.5  keyword_only
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: ((2 - length(ts_delete('''earthquak'':1 ''shake'':2'::tsvector, tsvector_to_array(to_tsvector('english'::regconfig, txt))))) > 0)
+
+
+== kw_fraction=0.5  classifier_only
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: hsql_event_type(to_tsvector('english'::regconfig, txt), 'earthquake'::text)
+
+
+== kw_fraction=0.5  two_udfs
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: (((2 - length(ts_delete('''earthquak'':1 ''shake'':2'::tsvector, tsvector_to_array(to_tsvector('english'::regconfig, txt))))) > 0) AND hsql_event_type(to_tsvector('english'::regconfig, txt), 'earthquake'::text))
+
+
+== kw_fraction=0.5  one_udf_inlined
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: (((2 - length(ts_delete('''earthquak'':1 ''shake'':2'::tsvector, tsvector_to_array(to_tsvector('english'::regconfig, txt))))) > 0) AND hsql_event_type(to_tsvector('english'::regconfig, txt), 'earthquake'::text))
+
+
+== kw_fraction=0.5  one_udf_plpgsql
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: hsql_event_type_eval_plpgsql(txt, 'earthquake'::text, '''earthquak'' | ''shake'''::tsquery)
+
+
+== kw_fraction=0.5  one_udf_sql
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: hsql_event_type_eval_sql(txt, 'earthquake'::text, '''earthquak'' | ''shake'''::tsquery)
+
+
+== kw_fraction=0.5  two_udfs_tsvector
+Aggregate
+  ->  Seq Scan on event_type_eval_docs
+        Filter: (((2 - length(ts_delete('''earthquak'':1 ''shake'':2'::tsvector, tsvector_to_array(tsv)))) > 0) AND hsql_event_type(tsv, 'earthquake'::text))
+
+
+== kw_fraction=0.5  two_udfs_gin_index
+Aggregate
+  ->  Bitmap Heap Scan on event_type_eval_docs
+        Recheck Cond: (to_tsvector('english'::regconfig, txt) @@ '''earthquak'' | ''shake'''::tsquery)
+        Filter: hsql_event_type(to_tsvector('english'::regconfig, txt), 'earthquake'::text)
+        ->  Bitmap Index Scan on event_type_eval_docs_txt_idx
+              Index Cond: (to_tsvector('english'::regconfig, txt) @@ '''earthquak'' | ''shake'''::tsquery)
+

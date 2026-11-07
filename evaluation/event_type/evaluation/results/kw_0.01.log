@@ -1,0 +1,76 @@
+>>> event_type benchmark settings
+    n_rows= 50000 , kw_fraction= 0.01
+    train_rows= 20000 , runs= 15
+SET
+SET
+ set_config 
+------------
+ 15
+(1 row)
+
+>>> creating event_type_eval_docs ( 50000  rows)
+DROP TABLE
+DROP TABLE
+ setseed 
+---------
+ 
+(1 row)
+
+SELECT 5000
+SELECT 50000
+ALTER TABLE
+ALTER TABLE
+UPDATE 50000
+VACUUM
+SELECT 20000
+ row_count | with_keyword | report_earthquake 
+-----------+--------------+-------------------
+     50000 |          502 |               249
+(1 row)
+
+>>> training the classifier
+ model_terms 
+-------------
+        5014
+(1 row)
+
+ANALYZE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE INDEX
+ANALYZE
+DROP TABLE
+CREATE TABLE
+INSERT 0 8
+DROP TABLE
+CREATE TABLE
+DO
+>>> plan of two_udfs_gin_index
+                                                 QUERY PLAN                                                 
+------------------------------------------------------------------------------------------------------------
+ Aggregate
+   ->  Bitmap Heap Scan on event_type_eval_docs
+         Recheck Cond: (to_tsvector('english'::regconfig, txt) @@ '''earthquak'' | ''shake'''::tsquery)
+         Filter: hsql_event_type(to_tsvector('english'::regconfig, txt), 'earthquake'::text)
+         ->  Bitmap Index Scan on event_type_eval_docs_txt_idx
+               Index Cond: (to_tsvector('english'::regconfig, txt) @@ '''earthquak'' | ''shake'''::tsquery)
+(6 rows)
+
+DO
+>>> results (times in ms)
+       query        | selected_rows | min_ms | median_ms | ratio_to_two_udfs 
+--------------------+---------------+--------+-----------+-------------------
+ two_udfs_gin_index |           249 |   21.5 |      44.5 |              0.04
+ two_udfs_tsvector  |           249 |   51.8 |     102.4 |              0.09
+ keyword_only       |           502 |  571.4 |    1006.6 |              0.93
+ one_udf_plpgsql    |           249 |  664.3 |    1030.8 |              0.94
+ one_udf_inlined    |           249 |  599.7 |    1060.8 |              0.98
+ two_udfs           |           249 |  609.8 |    1139.8 |              1.00
+ one_udf_sql        |           249 |  986.8 |    1618.0 |              1.49
+ classifier_only    |           249 | 1741.4 |    3050.3 |              2.75
+(8 rows)
+
+psql:/Users/pyghamdi/Dev/Research/HadathSQL Project/Code/hadath-sql/local/event_type/evaluation/eval.sql:88: NOTICE:  table "event_type_eval_docs" does not exist, skipping
+psql:/Users/pyghamdi/Dev/Research/HadathSQL Project/Code/hadath-sql/local/event_type/evaluation/eval.sql:89: NOTICE:  table "event_type_eval_train" does not exist, skipping
+psql:/Users/pyghamdi/Dev/Research/HadathSQL Project/Code/hadath-sql/local/event_type/evaluation/eval.sql:192: NOTICE:  table "event_type_eval_queries" does not exist, skipping
+psql:/Users/pyghamdi/Dev/Research/HadathSQL Project/Code/hadath-sql/local/event_type/evaluation/eval.sql:214: NOTICE:  table "event_type_eval_results" does not exist, skipping

@@ -1,0 +1,5 @@
+setting,n,threshold,clusters,tfidf_s,d1_s,d2_s,d3_s,driver_s,cte-array_s,cte-standard_s,mismatches
+tweets,600,0,1,.451,NA,237.388,190.488,.645,NA,NA,0
+tweets,1000,0.5,818,1.413,NA,1.524,.670,.667,NA,NA,0
+news,1000,0.2,50,6.323,NA,88.271,92.089,15.372,NA,NA,0
+news,1000,0.5,1000,6.690,NA,8.844,8.652,9.959,NA,NA,0

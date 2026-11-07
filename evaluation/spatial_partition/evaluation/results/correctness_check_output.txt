@@ -1,0 +1,42 @@
+== compact, 1000000 points, 1000 m cells
+assignments: grid join 1000000, lateral 1000000, unfiltered lateral 1000764, udf 1000000
+points not assigned to exactly one square: grid join 0, lateral 0, unfiltered lateral 762
+points assigned differently by grid join and lateral: 0
+points assigned differently from the expected square: grid join 0, lateral 0
+cells with a different point count in grid join and lateral: 0
+udf: points outside the cell returned for them: 0
+non-empty cells: grid join 3368, lateral 3368, udf 3383
+
+== skewed, 100000 points, 1000 m cells
+assignments: grid join 100000, lateral 100000, unfiltered lateral 100077, udf 100000
+points not assigned to exactly one square: grid join 0, lateral 0, unfiltered lateral 77
+points assigned differently by grid join and lateral: 0
+points assigned differently from the expected square: grid join 0, lateral 0
+cells with a different point count in grid join and lateral: 0
+udf: points outside the cell returned for them: 0
+non-empty cells: grid join 13681, lateral 13681, udf 13636
+
+== global, 100000 points, 10000 m cells
+assignments: grid join 100000, lateral 100000, unfiltered lateral 100012, udf 100000
+points not assigned to exactly one square: grid join 0, lateral 0, unfiltered lateral 12
+points assigned differently by grid join and lateral: 0
+points assigned differently from the expected square: grid join 0, lateral 0
+cells with a different point count in grid join and lateral: 0
+udf: points outside the cell returned for them: 0
+non-empty cells: grid join 6100, lateral 6100, udf 6094
+
+== squares per boundary test point (label|grid join|lateral|unfiltered lateral)
+interior|1|1|1
+0.0001 m below edge|1|1|2
+on shared edge|2|1|1
+on corner|4|1|1
+
+== lateral join on points exactly on cell boundaries
+
+exact corners, 1 km cells: 200000 points, 0 not assigned to exactly one square, 0 assigned to a square other than the expected one
+exact vertical edges, 1 km cells: 200000 points, 0 not assigned to exactly one square, 0 assigned to a square other than the expected one
+exact horizontal edges, 1 km cells: 200000 points, 0 not assigned to exactly one square, 0 assigned to a square other than the expected one
+corner, 1500 m cells: 1 square(s), expected square yes
+corner, 250 m cells: 1 square(s), expected square yes
+corner, 10 km cells, negative coordinates: 1 square(s), expected square yes
+

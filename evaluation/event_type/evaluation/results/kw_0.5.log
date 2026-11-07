@@ -1,0 +1,72 @@
+>>> event_type benchmark settings
+    n_rows= 50000 , kw_fraction= 0.5
+    train_rows= 20000 , runs= 15
+SET
+SET
+ set_config 
+------------
+ 15
+(1 row)
+
+>>> creating event_type_eval_docs ( 50000  rows)
+DROP TABLE
+DROP TABLE
+ setseed 
+---------
+ 
+(1 row)
+
+SELECT 5000
+SELECT 50000
+ALTER TABLE
+ALTER TABLE
+UPDATE 50000
+VACUUM
+SELECT 20000
+ row_count | with_keyword | report_earthquake 
+-----------+--------------+-------------------
+     50000 |        25012 |             12465
+(1 row)
+
+>>> training the classifier
+ model_terms 
+-------------
+        5014
+(1 row)
+
+ANALYZE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE INDEX
+ANALYZE
+DROP TABLE
+CREATE TABLE
+INSERT 0 8
+DROP TABLE
+CREATE TABLE
+DO
+>>> plan of two_udfs_gin_index
+                                                 QUERY PLAN                                                 
+------------------------------------------------------------------------------------------------------------
+ Aggregate
+   ->  Bitmap Heap Scan on event_type_eval_docs
+         Recheck Cond: (to_tsvector('english'::regconfig, txt) @@ '''earthquak'' | ''shake'''::tsquery)
+         Filter: hsql_event_type(to_tsvector('english'::regconfig, txt), 'earthquake'::text)
+         ->  Bitmap Index Scan on event_type_eval_docs_txt_idx
+               Index Cond: (to_tsvector('english'::regconfig, txt) @@ '''earthquak'' | ''shake'''::tsquery)
+(6 rows)
+
+DO
+>>> results (times in ms)
+       query        | selected_rows | min_ms | median_ms | ratio_to_two_udfs 
+--------------------+---------------+--------+-----------+-------------------
+ keyword_only       |         25012 |  687.9 |    1178.4 |              0.30
+ two_udfs_tsvector  |         12465 | 1299.5 |    1943.4 |              0.51
+ two_udfs_gin_index |         12465 | 1582.2 |    2633.4 |              0.69
+ one_udf_plpgsql    |         12465 | 2123.7 |    3342.6 |              0.84
+ one_udf_sql        |         12465 | 2353.9 |    3518.0 |              0.92
+ two_udfs           |         12465 | 2342.4 |    3925.8 |              1.00
+ one_udf_inlined    |         12465 | 2329.8 |    3811.7 |              1.00
+ classifier_only    |         12470 | 3102.7 |    4731.1 |              1.22
+(8 rows)
+

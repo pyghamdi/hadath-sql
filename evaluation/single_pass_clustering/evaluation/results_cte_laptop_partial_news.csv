@@ -1,0 +1,9 @@
+setting,n,threshold,clusters,tfidf_s,d1_s,sum_s,sumidx_s,sumidxp_s,d2_s,driver_s,noidx_s,mean_s,noprep_s,cte-array_s,cte-standard_s,mismatches
+news,25,0,1,.319,NA,NA,NA,NA,NA,.429,NA,NA,NA,NA,6.196,0
+news,50,0,1,.459,NA,NA,NA,NA,NA,.716,NA,NA,NA,NA,23.457,0
+news,100,0,1,.766,NA,NA,NA,NA,NA,1.278,NA,NA,NA,NA,82.047,0
+news,200,0,1,1.544,NA,NA,NA,NA,NA,2.303,NA,NA,NA,NA,279.360,0
+news,400,0,1,2.835,NA,NA,NA,NA,NA,4.629,NA,NA,NA,NA,637.928,0
+news,25,0.2,21,.306,NA,NA,NA,NA,NA,.342,NA,NA,NA,NA,6.412,0
+news,50,0.2,32,.483,NA,NA,NA,NA,NA,.632,NA,NA,NA,NA,25.168,0
+news,100,0.2,45,.777,NA,NA,NA,NA,NA,1.401,NA,NA,NA,NA,98.501,0

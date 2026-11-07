@@ -1,0 +1,10 @@
+date: 2026-10-13T15:06:08
+arguments: {'fractions': ['0.01', '0.1', '0.5'], 'rows': 50000, 'train_rows': 20000, 'runs': 15, 'db': 'hsql_bench_event_type', 'keep_db': False}
+machine: macOS-15.8.1-x86_64-i386-64bit, i386, 16 logical CPUs
+PostgreSQL 18.6 (Homebrew) on x86_64-apple-darwin23.6.0, compiled by Apple clang version 16.0.0 (clang-1600.0.26.6), 64-bit
+default_text_search_config = pg_catalog.english
+jit = off
+max_parallel_workers_per_gather = 0
+shared_buffers = 16384
+work_mem = 4096
+database collation = en_US.UTF-8

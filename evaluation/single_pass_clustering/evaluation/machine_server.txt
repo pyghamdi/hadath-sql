@@ -1,0 +1,16 @@
+date: 2026-10-22 08:14:30 -0500
+host: Linux <server> 6.8.0-111-generic #111~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue Apr 14 17:13:45 UTC  x86_64 x86_64 x86_64 GNU/Linux
+CPU(s):                                  20
+Model name:                              Intel(R) Xeon(R) Silver 4114 CPU @ 2.20GHz
+Thread(s) per core:                      2
+Core(s) per socket:                      10
+Socket(s):                               1
+MemTotal:       97331372 kB
+PostgreSQL 18.6 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, 64-bit
+effective_cache_size = 524288 8kB
+jit = on
+maintenance_work_mem = 65536 kB
+max_parallel_workers_per_gather = 2
+random_page_cost = 4
+shared_buffers = 16384 8kB
+work_mem = 4096 kB

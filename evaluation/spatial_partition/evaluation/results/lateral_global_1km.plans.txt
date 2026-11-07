@@ -1,0 +1,163 @@
+-- docs_global_1000 / hadath
+Aggregate
+  ->  HashAggregate
+        Group Key: hsql_spatial_partition(docs_global_1000.x, docs_global_1000.y, '1000'::numeric, '0'::numeric, '0'::numeric)
+        ->  Seq Scan on docs_global_1000
+
+-- docs_global_1000 / lateral
+Aggregate
+  ->  HashAggregate
+        Group Key: g.i, g.j
+        ->  Nested Loop
+              ->  Seq Scan on docs_global_1000 d
+              ->  Function Scan on st_squaregrid g
+
+-- docs_global_1000 / lateral_exact
+Aggregate
+  ->  GroupAggregate
+        Group Key: g.i, g.j
+        ->  Sort
+              Sort Key: g.i, g.j
+              ->  Nested Loop
+                    ->  Seq Scan on docs_global_1000 d
+                    ->  Function Scan on st_squaregrid g
+                          Filter: st_intersects(d.geom, geom)
+
+-- docs_global_10000 / hadath
+Aggregate
+  ->  HashAggregate
+        Group Key: hsql_spatial_partition(docs_global_10000.x, docs_global_10000.y, '1000'::numeric, '0'::numeric, '0'::numeric)
+        ->  Seq Scan on docs_global_10000
+
+-- docs_global_10000 / lateral
+Aggregate
+  ->  HashAggregate
+        Group Key: g.i, g.j
+        ->  Nested Loop
+              ->  Seq Scan on docs_global_10000 d
+              ->  Function Scan on st_squaregrid g
+
+-- docs_global_10000 / lateral_exact
+Aggregate
+  ->  GroupAggregate
+        Group Key: g.i, g.j
+        ->  Sort
+              Sort Key: g.i, g.j
+              ->  Nested Loop
+                    ->  Seq Scan on docs_global_10000 d
+                    ->  Function Scan on st_squaregrid g
+                          Filter: st_intersects(d.geom, geom)
+
+-- docs_global_100000 / hadath
+Aggregate
+  ->  HashAggregate
+        Group Key: hsql_spatial_partition(docs_global_100000.x, docs_global_100000.y, '1000'::numeric, '0'::numeric, '0'::numeric)
+        ->  Seq Scan on docs_global_100000
+
+-- docs_global_100000 / lateral
+Aggregate
+  ->  Finalize GroupAggregate
+        Group Key: g.i, g.j
+        ->  Gather Merge
+              Workers Planned: 1
+              ->  Sort
+                    Sort Key: g.i, g.j
+                    ->  Partial HashAggregate
+                          Group Key: g.i, g.j
+                          ->  Nested Loop
+                                ->  Parallel Seq Scan on docs_global_100000 d
+                                ->  Function Scan on st_squaregrid g
+
+-- docs_global_100000 / lateral_exact
+Aggregate
+  ->  Finalize GroupAggregate
+        Group Key: g.i, g.j
+        ->  Gather Merge
+              Workers Planned: 1
+              ->  Partial GroupAggregate
+                    Group Key: g.i, g.j
+                    ->  Sort
+                          Sort Key: g.i, g.j
+                          ->  Nested Loop
+                                ->  Parallel Seq Scan on docs_global_100000 d
+                                ->  Function Scan on st_squaregrid g
+                                      Filter: st_intersects(d.geom, geom)
+
+-- docs_global_1000000 / hadath
+Aggregate
+  ->  GroupAggregate
+        Group Key: (hsql_spatial_partition(docs_global_1000000.x, docs_global_1000000.y, '1000'::numeric, '0'::numeric, '0'::numeric))
+        ->  Gather Merge
+              Workers Planned: 2
+              ->  Sort
+                    Sort Key: (hsql_spatial_partition(docs_global_1000000.x, docs_global_1000000.y, '1000'::numeric, '0'::numeric, '0'::numeric))
+                    ->  Parallel Seq Scan on docs_global_1000000
+
+-- docs_global_1000000 / lateral
+Aggregate
+  ->  Finalize GroupAggregate
+        Group Key: g.i, g.j
+        ->  Gather Merge
+              Workers Planned: 2
+              ->  Sort
+                    Sort Key: g.i, g.j
+                    ->  Partial HashAggregate
+                          Group Key: g.i, g.j
+                          ->  Nested Loop
+                                ->  Parallel Seq Scan on docs_global_1000000 d
+                                ->  Function Scan on st_squaregrid g
+
+-- docs_global_1000000 / lateral_exact
+Aggregate
+  ->  Finalize GroupAggregate
+        Group Key: g.i, g.j
+        ->  Gather Merge
+              Workers Planned: 2
+              ->  Partial GroupAggregate
+                    Group Key: g.i, g.j
+                    ->  Sort
+                          Sort Key: g.i, g.j
+                          ->  Nested Loop
+                                ->  Parallel Seq Scan on docs_global_1000000 d
+                                ->  Function Scan on st_squaregrid g
+                                      Filter: st_intersects(d.geom, geom)
+
+-- docs_global_10000000 / hadath
+Aggregate
+  ->  GroupAggregate
+        Group Key: (hsql_spatial_partition(docs_global_10000000.x, docs_global_10000000.y, '1000'::numeric, '0'::numeric, '0'::numeric))
+        ->  Gather Merge
+              Workers Planned: 2
+              ->  Sort
+                    Sort Key: (hsql_spatial_partition(docs_global_10000000.x, docs_global_10000000.y, '1000'::numeric, '0'::numeric, '0'::numeric))
+                    ->  Parallel Seq Scan on docs_global_10000000
+
+-- docs_global_10000000 / lateral
+Aggregate
+  ->  Finalize GroupAggregate
+        Group Key: g.i, g.j
+        ->  Gather Merge
+              Workers Planned: 2
+              ->  Sort
+                    Sort Key: g.i, g.j
+                    ->  Partial HashAggregate
+                          Group Key: g.i, g.j
+                          ->  Nested Loop
+                                ->  Parallel Seq Scan on docs_global_10000000 d
+                                ->  Function Scan on st_squaregrid g
+
+-- docs_global_10000000 / lateral_exact
+Aggregate
+  ->  Finalize GroupAggregate
+        Group Key: g.i, g.j
+        ->  Gather Merge
+              Workers Planned: 2
+              ->  Partial GroupAggregate
+                    Group Key: g.i, g.j
+                    ->  Sort
+                          Sort Key: g.i, g.j
+                          ->  Nested Loop
+                                ->  Parallel Seq Scan on docs_global_10000000 d
+                                ->  Function Scan on st_squaregrid g
+                                      Filter: st_intersects(d.geom, geom)
+
