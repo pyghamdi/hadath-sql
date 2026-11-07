@@ -107,9 +107,21 @@ class TFIDF:
         Args:
             text: The text content of the document to insert
         """
+        self.insert_counts(self.tokenize(text, output="dict"))
+
+    def insert_counts(self, term_counts: Dict[str, int]) -> None:
+        """
+        Insert a document that has already been tokenized.
+
+        Same as `insert`, but takes the document's term counts (as returned by
+        `tokenize(text, output="dict")`) instead of its text, so that a caller that
+        keeps the term counts tokenizes each document only once.
+
+        Args:
+            term_counts: Mapping from each term of the document to its number of occurrences
+        """
         self.total_documents += 1
-        terms = self.tokenize(text, output="dict")
-        for term in terms:
+        for term in term_counts:
             self.document_frequency[term] += 1
 
     def get_df(self, term: str) -> int:
@@ -195,8 +207,26 @@ class TFIDF:
         Args:
             text: The text to compute the TF-IDF vector for
         """
-        terms = self.tokenize(text, output="list")
-        return {term: self.get_tfidf(text, term) for term, _ in terms}
+        return self.get_tfidf_vector_from_counts(self.tokenize(text, output="dict"))
+
+    def get_tfidf_vector_from_counts(self, term_counts: Dict[str, int]) -> Dict[str, float]:
+        """
+        Return the TF-IDF vector of a document that has already been tokenized.
+
+        Computes the same weights as `get_tfidf` for every term of the document, but from
+        its term counts (as returned by `tokenize(text, output="dict")`), so the document
+        is not tokenized again for each of its terms.
+
+        Args:
+            term_counts: Mapping from each term of the document to its number of occurrences
+        """
+        total_tokens = float(sum(term_counts.values()))
+        if total_tokens == 0.0:
+            return {term: 0.0 for term in term_counts}
+        return {
+            term: (float(count) / total_tokens) * self.get_idf(term)
+            for term, count in term_counts.items()
+        }
 
     def get_stats(self) -> Dict[str, Any]:
         """
