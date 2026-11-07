@@ -6,7 +6,8 @@
 --   3) Aggregate UDAs: hsql_count_shared_terms, hsql_entropy (agg_funcs/)
 --   4) Temporal partitioning (hsql_time_partition, time_partition_id)
 --   5) Spatial partitioning (hsql_spatial_partition, spatial_partition_id)
---   6) Single-pass clustering and its LSH variant (single_pass_clustering/)
+--   6) Event-type UDFs: hsql_overlap, hsql_event_type (event_type/)
+--   7) Single-pass clustering and its LSH variant (single_pass_clustering/)
 --
 -- The script is meant for a database that does not contain HadathSQL yet: it
 -- creates the objects and does not drop existing ones, so running it a second
@@ -38,6 +39,9 @@
 
 \echo '>>> spatial_partition/space_partition.sql'
 \ir spatial_partition/space_partition.sql
+
+\echo '>>> event_type/event_type.sql'
+\ir event_type/event_type.sql
 
 \echo '>>> single_pass_clustering/sp_clustering.sql'
 \ir single_pass_clustering/sp_clustering.sql

@@ -1,6 +1,6 @@
 # HadathSQL
 
-PostgreSQL extensions for event detection analytics: TF-IDF, custom aggregate functions, temporal and spatial partitioning, and single-pass clustering — all callable from SQL.
+PostgreSQL extensions for event detection analytics: TF-IDF, custom aggregate functions, temporal and spatial partitioning, event-type filtering, and single-pass clustering — all callable from SQL.
 
 Functions are prefixed with `hsql_` (including aggregates and partition helpers).
 
@@ -36,8 +36,9 @@ Replace `hadathdb` with your database name. The script expects a database that d
 | 4 | `agg_funcs/entropy.sql` | `hsql_entropy` aggregate, for `text` and for `tsvector` input |
 | 5 | `time_partition/time_partitioning.sql` | `time_partition_id` type and `hsql_time_partition()` |
 | 6 | `spatial_partition/space_partition.sql` | `spatial_partition_id` type and `hsql_spatial_partition()` |
-| 7 | `single_pass_clustering/sp_clustering.sql` | Single-pass clustering with built-in TF-IDF |
-| 8 | `single_pass_clustering/lsh_sp_clustering.sql` | LSH-accelerated variant |
+| 7 | `event_type/event_type.sql` | `hsql_overlap()`, `hsql_has_keyword()`, `hsql_event_type()`, `hsql_train_event_type()`, and the `hsql_event_type_model` table |
+| 8 | `single_pass_clustering/sp_clustering.sql` | Single-pass clustering with built-in TF-IDF |
+| 9 | `single_pass_clustering/lsh_sp_clustering.sql` | LSH-accelerated variant |
 
 > **Note:** The install script must be run with `psql`. Plain `CREATE` statements sent through other clients cannot resolve `\ir` includes.
 
@@ -59,6 +60,7 @@ hadath-sql/
 ├── agg_funcs/                  # Custom aggregates (entropy, count_shared_terms)
 ├── time_partition/             # Temporal grid partitioning
 ├── spatial_partition/          # Web Mercator spatial grid partitioning
+├── event_type/                 # Keyword match and classifier for events of a specific type
 ├── single_pass_clustering/     # Leader clustering (+ LSH variant)
 ├── dataset/                    # Sample corpora and loaders (see dataset/README.md)
 └── cfunc/                      # Optional C extension with the aggregates in C (see cfunc/README.md)
@@ -91,6 +93,17 @@ FROM docs
 GROUP BY period, cell;
 ```
 
+**Select the documents that report an event of a specific type**, after training a classifier from labeled documents in `labeled_docs(txt, is_earthquake)`:
+
+```sql
+SELECT hsql_train_event_type('earthquake', 'labeled_docs', 'txt', 'is_earthquake');
+
+SELECT *
+FROM docs
+WHERE hsql_overlap(txt, 'earthquake, shaking') > 0
+  AND hsql_event_type(txt, 'earthquake');
+```
+
 **Score candidate events** with the aggregates:
 
 ```sql
@@ -116,6 +129,9 @@ psql -d hsql_test -f tf_idf/tests/test_sql_vs_python_parity.sql
 # Aggregate function tests
 psql -d hadathdb -f agg_funcs/tests/test_count_shared_terms.sql
 psql -d hadathdb -f agg_funcs/tests/test_entropy.sql
+
+# Event-type UDF tests
+psql -d hadathdb -f event_type/tests/test_event_type.sql
 
 # Runtime benchmarks (may require Python eval data scripts first)
 psql -d hadathdb -f tf_idf/eval/eval.sql
