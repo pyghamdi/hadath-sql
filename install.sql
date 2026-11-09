@@ -2,7 +2,7 @@
 --
 -- Loads:
 --   1) util helpers (e.g. hsql_table_exists_any_schema)
---   2) TF-IDF UDFs (hsql_process_text, hsql_create_tf_idf_tbl)
+--   2) TF-IDF UDFs (hsql_term_counts, hsql_create_tf_idf_tbl)
 --   3) Aggregate UDAs: hsql_count_shared_terms, hsql_entropy (agg_funcs/)
 --   4) Temporal partitioning (hsql_time_partition, time_partition_id)
 --   5) Spatial partitioning (hsql_spatial_partition, spatial_partition_id)

@@ -39,10 +39,10 @@ def create_to_tsvector_tokenizer(db_connection):
             return []
         
         with db_connection.cursor() as cursor:
-            # hsql_process_text returns rows of (term, freq).
+            # hsql_term_counts returns rows of (term, freq).
             # Expand them into a plain token list expected by TFIDF's tokenizer contract.
             cursor.execute(
-                "SELECT * FROM hsql_process_text(%s)",
+                "SELECT * FROM hsql_term_counts(%s)",
                 (text,)
             )
             result = cursor.fetchall()
@@ -153,7 +153,7 @@ def demo_usage(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Build a TF-IDF model from a PostgreSQL table (hsql_process_text tokenizer)."
+        description="Build a TF-IDF model from a PostgreSQL table (hsql_term_counts tokenizer)."
     )
     parser.add_argument("--table-name", required=True)
     parser.add_argument("--text-column", required=True)

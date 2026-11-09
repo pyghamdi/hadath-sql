@@ -31,7 +31,7 @@ Replace `hadathdb` with your database name. The script expects a database that d
 | Step | Script | What it installs |
 |------|--------|------------------|
 | 1 | `util/table_utils.sql` | Shared helpers (`hsql_table_exists_any_schema`, …) |
-| 2 | `tf_idf/tf_idf.sql` | Text tokenization and TF-IDF table builders (`hsql_process_text`, `hsql_create_tf_idf_tbl`) |
+| 2 | `tf_idf/tf_idf.sql` | Text tokenization and TF-IDF table builders (`hsql_term_counts`, `hsql_create_tf_idf_tbl`) |
 | 3 | `agg_funcs/count_shared_terms.sql` | `hsql_count_shared_terms` aggregate, for `text` and for `tsvector` input |
 | 4 | `agg_funcs/entropy.sql` | `hsql_entropy` aggregate, for `text` and for `tsvector` input |
 | 5 | `time_partition/time_partitioning.sql` | `time_partition_id` type and `hsql_time_partition()` |

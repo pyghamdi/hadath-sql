@@ -5,7 +5,7 @@ Builds a TF-IDF output table from a source document table using iterative
 processing and temporary helper tables.
 
 Requires:
-  - hsql_process_text(input text), defined in ../tf_idf.sql
+  - hsql_term_counts(input text), defined in ../tf_idf.sql
 
 Parameters:
   input_tbl             - Source corpus table
@@ -92,7 +92,7 @@ BEGIN
             'INSERT INTO %I (doc_id, term, count)
              SELECT $1::integer AS doc_id, (terms_count).term, (terms_count).count
              FROM (
-                 SELECT hsql_process_text($2::text) AS terms_count
+                 SELECT hsql_term_counts($2::text) AS terms_count
              ) AS src',
             docid_term_count_tbl
         ) USING doc_id, doc_txt;

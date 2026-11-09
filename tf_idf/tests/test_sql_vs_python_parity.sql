@@ -104,7 +104,7 @@ INSERT INTO tfidf_parity_corpus (doc_id, txt) VALUES
     (4, 'database sql query index table join'),
     (5, 'postgresql query optimization index planner');
 
-\echo '>>> Python: populate tfidf_from_python (python/tf_idf.py + hsql_process_text)'
+\echo '>>> Python: populate tfidf_from_python (python/tf_idf.py + hsql_term_counts)'
 \setenv PGDATABASE :db_name
 \! python3 tf_idf/python/generate_sql_python_parity_reference.py
 

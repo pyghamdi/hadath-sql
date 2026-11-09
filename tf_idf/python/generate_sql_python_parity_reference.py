@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Populate tfidf_from_python (doc_id, term, weight) using python/tf_idf.TFIDF + the same
-PostgreSQL tokenizer as tf_idf.sql (hsql_process_text).
+PostgreSQL tokenizer as tf_idf.sql (hsql_term_counts).
 
 Prerequisite: table tfidf_parity_corpus(doc_id, txt) already exists and is filled
 (see tf_idf/tests/test_sql_vs_python_parity.sql). Functions from tf_idf.sql must be loaded in the database.
@@ -50,7 +50,7 @@ def _make_tokenizer(conn):
         if not text:
             return []
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM hsql_process_text(%s)", (text,))
+            cur.execute("SELECT * FROM hsql_term_counts(%s)", (text,))
             rows = cur.fetchall()
         tokens: list[str] = []
         for term, freq in rows:
