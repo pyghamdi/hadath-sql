@@ -31,6 +31,11 @@ class Tokenizer:
         self.stop = set(Path(stopfile or _default_stopfile()).read_text().split())
         self.stem = Stemmer.Stemmer("english").stemWord
 
+    def tokens(self, text: str) -> list:
+        """The terms of `text` in order, with repetitions."""
+        return [self.stem(w) for w in self._split.split(text.lower())
+                if w and w not in self.stop]
+
     def __call__(self, text: str) -> Counter:
-        return Counter(self.stem(w) for w in self._split.split(text.lower())
-                       if w and w not in self.stop)
+        """The terms of `text` with their counts."""
+        return Counter(self.tokens(text))

@@ -9,7 +9,8 @@ the datasets and the server setup used here as well.
 |---|---|
 | HadathSQL driver (`single_pass_clustering/sp_clustering.sql`; key `driver`) | ready |
 | Standard SQL CTE (`prep_cte_standard.sql`, `run_cte_standard.sql`; key `cte-standard`) | ready (`comparison_cte.conf`) |
-| External pipeline (clustering outside the database) | to be defined |
+| External pipeline, TF-IDF stage (`tfidf_python.py`, scikit-learn `TfidfVectorizer`) | ready (`run_tfidf_comparison.py`) |
+| External pipeline, clustering stage (`pipeline_python.py`) | to be written |
 
 ## Standard SQL CTE
 
@@ -35,9 +36,41 @@ run on the laptop (2026-10-20, stopped when the laptop shut down) is kept as
 
 ## External pipeline
 
-To be defined: the system (e.g. a Python program that reads the documents from the
-database, clusters them, and writes the clusters back), what its time includes
-(data transfer, TF-IDF), and how its clusters are checked against HadathSQL's.
+A Python program that reads the documents from PostgreSQL, computes TF-IDF and the
+clusters, and writes them back. Its time includes the export and the import.
+
+### TF-IDF stage (`run_tfidf_comparison.py`)
+
+HadathSQL's `hsql_create_tf_idf_tbl` against `tfidf_python.py`: export
+(`SELECT doc_id, txt`), preprocessing (`tokenizer_python.py`, the same terms as
+`to_tsvector('english', ...)`; checked by `check_tokenizer.py`), scikit-learn
+`TfidfVectorizer` with its defaults (single-threaded; its weights differ from
+HadathSQL's, the (doc_id, term) pairs are the same), and import with `COPY`.
+
+- Both weights tables are UNLOGGED (no write-ahead log): the times measure computing
+  the weights, not logging the rows written. UNLOGGED is the default of
+  `hsql_create_tf_idf_tbl`.
+- PostgreSQL uses all cores: `--workers` parallel workers (default: physical cores - 1,
+  since the query's own process works too), set per session and as the
+  `parallel_workers` parameter of `sp_docs`. The server needs
+  `max_worker_processes` >= the number of workers in `postgresql.conf` (default 8;
+  restart needed); the script stops otherwise. Workers actually started are recorded
+  per size (`sql_workers_launched`); for small tables the planner may start none.
+- `work_mem` is set per size to the peak memory of the Python process at that size
+  (`py_peak_mb`; Python runs first), unless `--work-mem` fixes it.
+- Sizes: Synthetic-Tweets 125 to 256,000, Synthetic-News 125 to 64,000 (doubling);
+  median of up to 3 runs (1 run when a run takes 60 s or more); 30-minute limit.
+- Results: `results_tfidf_synthetic_tweets.csv`, `results_tfidf_synthetic_news.csv`.
+- Requires `pip install psycopg2-binary PyStemmer scikit-learn`.
+
+Run on the server (not at the same time as another sweep):
+`nohup python3 run_tfidf_comparison.py > sweep_tfidf.log 2>&1 &`
+
+### Clustering stage
+
+To be written (`pipeline_python.py`). Since the scikit-learn weights differ from
+HadathSQL's, its clusters cannot be checked against HadathSQL's unless it uses the
+same weights (open decision, see the paper).
 
 ## How to run (remote server)
 
