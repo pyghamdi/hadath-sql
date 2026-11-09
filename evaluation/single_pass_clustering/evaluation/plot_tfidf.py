@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 """Figure of the TF-IDF comparison (COMPARISON.md, "TF-IDF stage"):
 
-  tfidf_sizes.pdf    time against the number of documents (log-log), one panel per
-                     dataset: HadathSQL with PostgreSQL's default parallel workers
-                     (results_tfidf_<setting>.csv), HadathSQL with all cores
-                     (results_tfidf_w9_<setting>.csv), and scikit-learn (its time,
-                     export and import included, from the default run)
+  tfidf_sizes.pdf    time against the number of documents (log-log) and the lead of
+                     HadathSQL (scikit-learn's time / HadathSQL's), one panel per
+                     dataset: HadathSQL with PostgreSQL's default parallel workers and
+                     scikit-learn, export and import included (results_tfidf_<setting>.csv)
 
-Written into the paper's Figures folder. Run with the project environment, which has
-matplotlib:  ../../../.venv/bin/python plot_tfidf.py
-Text is typeset by LaTeX (text.usetex) so that it matches the paper.
+Written into the paper's Figures folder. Needs matplotlib and LaTeX (text.usetex).
 """
 import csv
 import os
@@ -26,7 +23,6 @@ os.environ["PATH"] = "/Library/TeX/texbin:" + os.environ.get("PATH", "")
 # method in the first color of the validated categorical palette; the two series also
 # differ in marker and line style, so neither is identified by color alone.
 HADATH = dict(color="#1a1a1a", marker="o", linestyle="-")
-HADATH_ALL = dict(color="#1a1a1a", marker="^", linestyle=":", markerfacecolor="white")
 SKLEARN = dict(color="#2a78d6", marker="s", linestyle="--")
 DATASETS = [("synthetic_tweets", "Synthetic-Tweets"), ("synthetic_news", "Synthetic-News")]
 
@@ -71,17 +67,15 @@ def sizes_figure():
     for col, (key, title) in enumerate(DATASETS):
         ax, rax = grid[0][col], grid[1][col]
         default = read(os.path.join(HERE, f"results_tfidf_{key}.csv"))
-        allcores = read(os.path.join(HERE, f"results_tfidf_w9_{key}.csv"))
-        py = dict(series(default or allcores, "py_s"))
-        lines = [(series(default, "sql_s"), r"\textsc{HadathSQL}, default workers (up to 2)", HADATH),
-                 (series(allcores, "sql_s"), r"\textsc{HadathSQL}, all cores (9 workers)", HADATH_ALL),
+        py = dict(series(default, "py_s"))
+        lines = [(series(default, "sql_s"), r"\textsc{HadathSQL} (PostgreSQL's default parallel workers)", HADATH),
                  (sorted(py.items()), "scikit-learn (1 thread)", SKLEARN)]
         ns = sorted({n for pts, _, _ in lines for n, _ in pts})
         for pts, label, style in lines:
             if pts:
                 ax.plot(*zip(*pts), label=label, linewidth=1.3, markersize=3.5, **style)
         # Lead of HadathSQL: scikit-learn's time divided by HadathSQL's (1 = equal).
-        for pts, label, style in lines[:2]:
+        for pts, label, style in lines[:1]:
             lead = [(n, py[n] / t) for n, t in pts if n in py and t]
             if lead:
                 rax.plot(*zip(*lead), linewidth=1.3, markersize=3.5, **style)
@@ -100,7 +94,7 @@ def sizes_figure():
     grid[0][0].set_ylabel("time (s)")
     grid[1][0].set_ylabel("lead of \\textsc{HadathSQL}\n(scikit-learn time / its time)")
     handles, labels = grid[0][0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncol=3, frameon=False, bbox_to_anchor=(0.5, 1.03))
+    fig.legend(handles, labels, loc="upper center", ncol=2, frameon=False, bbox_to_anchor=(0.5, 1.03))
     fig.tight_layout(rect=(0, 0, 1, 0.94))
     fig.savefig(os.path.join(OUT, "tfidf_sizes.pdf"), bbox_inches="tight")
     plt.close(fig)
