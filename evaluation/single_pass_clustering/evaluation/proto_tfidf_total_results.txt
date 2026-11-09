@@ -1,0 +1,17 @@
+Prototype of the TF-IDF query without the aggregation and join on doc_id (proto_tfidf_total.py)
+Laptop (8-core Intel Core i9-9980HK, PostgreSQL 18), 8,000 Synthetic-News documents (2,604,964 weights),
+median of 3 interleaved runs, load average 3-5 during the runs (noisy), 2026-11-09.
+
+workers=0  A current              median   7.38 s  runs 7.38, 7.27, 7.56  rows differing from current: 0
+workers=0  B stats function       median   8.11 s  runs 8.27, 7.97, 8.11  rows differing from current: 0
+workers=0  C term_counts+total    median   7.66 s  runs 7.75, 7.66, 7.58  rows differing from current: 0
+workers=2  A current              median   4.88 s  runs 4.79, 4.88, 5.62  rows differing from current: 0
+workers=2  B stats function       median   4.65 s  runs 4.27, 4.65, 5.16  rows differing from current: 0
+workers=2  C term_counts+total    median   5.73 s  runs 5.21, 5.73, 6.18  rows differing from current: 0
+
+EXPLAIN ANALYZE of A (SELECT only, no workers): about 4.1 s for to_tsvector and expanding the terms,
+about 1.4 s for the aggregation by doc_id and its join (about 15%), about 0.9 s for the aggregation by
+term, about 1.2 s for the join on term and the weights; total 9.2 s with instrumentation.
+Plans: a total in a lateral aggregate or a scalar subquery prevents the parallel plan; a SQL function
+total(tsv) in the OFFSET 0 subquery is inlined and makes to_tsvector run twice per document.
+Conclusion: not adopted; the saving is within the noise and B/C cost about as much as they save.

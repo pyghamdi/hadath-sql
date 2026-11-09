@@ -14,15 +14,15 @@ Both start from sp_docs and end with a TF-IDF table in PostgreSQL. Both tables a
 UNLOGGED (no write-ahead log), so that the times measure computing the weights rather
 than PostgreSQL's logging of the rows written.
 
-Parallelism: the point of the comparison is the benefit of running TF-IDF inside a
-DBMS that computes in parallel, against single-threaded scikit-learn. PostgreSQL
-therefore uses --workers parallel workers (default: physical cores - 1; the leader
-process works too, so all cores are used): max_parallel_workers_per_gather and
-max_parallel_workers are set for the session, and the parallel_workers storage
-parameter of sp_docs is set so that the planner does not reduce the number for a
-small table. The server's max_worker_processes (postgresql.conf, restart needed)
-must be at least --workers; the script stops otherwise. The number of workers
-PostgreSQL actually launches is recorded for every size (sql_workers_launched).
+Parallelism: by default PostgreSQL keeps its configuration (up to 2 parallel workers
+per query, chosen by the planner from the table size); sql_workers is "default".
+--workers n sets max_parallel_workers_per_gather and max_parallel_workers for the
+session and the parallel_workers storage parameter of sp_docs (so that the planner
+does not reduce the number for a small table); for n workers the server's
+max_worker_processes (postgresql.conf, restart needed) must be at least n, and the
+script stops otherwise. All cores: --workers <physical cores - 1> (the process that
+runs the query works too). The number of workers PostgreSQL actually launches is
+recorded for every size (sql_workers_launched).
 
 Memory: PostgreSQL's work_mem is set, for every size, to the peak resident memory
 of the Python process at that size (Python runs first), so that both methods have
@@ -30,12 +30,13 @@ a similar memory budget (--work-mem sets a fixed value instead).
 
 Each method is run up to --reps times (median reported) while a run takes less than
 --rep-max seconds; slower runs are measured once. A run is stopped after --timeout
-seconds, and a method that reaches it is not run at larger sizes of the same
+seconds (0: no limit), and a method that reaches it is not run at larger sizes of the same
 dataset. After the runs, the two tables are compared on their (doc_id, term) pairs,
 which must be the same; the weights differ, since TfidfVectorizer uses its own
 default formula (see tfidf_python.py).
 
-  python3 run_tfidf_comparison.py                       # size sweep, all cores
+  python3 run_tfidf_comparison.py                       # size sweep, default workers
+  python3 run_tfidf_comparison.py --workers 9 --prefix results_tfidf_w9_   # all 10 cores
   python3 run_tfidf_comparison.py --worker-sweep        # worker sweep, largest sizes
   python3 run_tfidf_comparison.py --settings synthetic_news --sizes 125 250 --reps 1
 
@@ -74,8 +75,8 @@ GEN = {
     "synthetic_news": dict(topic_words=200, vocab=200, bg_words=200, bg_vocab=20000),
 }
 SIZES = {
-    "synthetic_tweets": [125 * 2 ** i for i in range(12)],  # 125 .. 256,000
-    "synthetic_news": [125 * 2 ** i for i in range(10)],    # 125 .. 64,000
+    "synthetic_tweets": [125 * 2 ** i for i in range(14)],  # 125 .. 1,024,000
+    "synthetic_news": [125 * 2 ** i for i in range(12)],    # 125 .. 256,000
 }
 PY_STEPS = ["export_s", "tokenize_s", "weights_s", "import_s"]
 HDR = (["setting", "n", "rows", "sql_s", "py_s"] + ["py_" + s for s in PY_STEPS]
@@ -116,14 +117,21 @@ def generate(setting, n):
 
 def set_table_workers(workers):
     """parallel_workers storage parameter of sp_docs, so that the planner does not use
-    fewer workers than allowed because the table is small."""
-    psql("-c", f"ALTER TABLE sp_docs SET (parallel_workers = {workers})")
+    fewer workers than allowed because the table is small; workers None removes it, so
+    that the planner chooses from the table size as by default."""
+    if workers is None:
+        psql("-c", "ALTER TABLE sp_docs RESET (parallel_workers)")
+    else:
+        psql("-c", f"ALTER TABLE sp_docs SET (parallel_workers = {workers})")
 
 
 def session_options(timeout, workers, work_mem_mb):
-    return (f"-c statement_timeout={timeout}s -c client_min_messages=warning"
-            f" -c max_parallel_workers_per_gather={workers} -c max_parallel_workers={workers}"
-            f" -c work_mem={work_mem_mb}MB")
+    """Session settings; workers None keeps PostgreSQL's configuration (default: up to
+    2 workers per query)."""
+    opts = f"-c statement_timeout={timeout}s -c client_min_messages=warning -c work_mem={work_mem_mb}MB"
+    if workers is not None:
+        opts += f" -c max_parallel_workers_per_gather={workers} -c max_parallel_workers={workers}"
+    return opts
 
 
 def workers_launched(workers, work_mem_mb):
@@ -171,7 +179,8 @@ def run_python(timeout):
     """One run of tfidf_python.py in its own process; dict of step times or 'TIMEOUT'."""
     try:
         out = subprocess.run([sys.executable, str(HERE / "tfidf_python.py"), "--out", "tfidf_py"],
-                             capture_output=True, text=True, check=True, timeout=timeout).stdout
+                             capture_output=True, text=True, check=True,
+                             timeout=timeout or None).stdout
     except subprocess.TimeoutExpired:
         return "TIMEOUT"
     return json.loads(out)
@@ -223,9 +232,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--settings", nargs="+", default=list(GEN))
     ap.add_argument("--sizes", nargs="+", type=int, help="override the sizes of every setting")
-    ap.add_argument("--workers", nargs="+", type=int, default=[default_workers],
-                    help="parallel workers for PostgreSQL, one or more values "
-                         f"(default: physical cores - 1 = {default_workers})")
+    ap.add_argument("--workers", nargs="+", type=int, default=[None],
+                    help="parallel workers for PostgreSQL, one or more values; default: "
+                         "PostgreSQL's configuration (up to 2 workers per query by default), "
+                         f"e.g. --workers {default_workers} for all physical cores")
     ap.add_argument("--worker-sweep", action="store_true",
                     help="worker sweep: workers 0, 1, 2, 4, and physical cores - 1, at the "
                          "largest size of each setting, into results_tfidf_workers_<setting>.csv")
@@ -233,15 +243,16 @@ def main():
                     help="fixed work_mem in MB (default: Python's peak memory at each size)")
     ap.add_argument("--reps", type=int, default=3)
     ap.add_argument("--rep-max", type=float, default=60)
-    ap.add_argument("--timeout", type=int, default=1800)
+    ap.add_argument("--timeout", type=int, default=1800,
+                    help="time limit per run in seconds; 0 means no limit")
     ap.add_argument("--prefix")
     a = ap.parse_args()
     if a.worker_sweep:
         a.workers = sorted({0, 1, 2, 4, default_workers})
     a.prefix = a.prefix or ("results_tfidf_workers_" if a.worker_sweep else "results_tfidf_")
-    check_server(max(a.workers))
-    print(f"workers={a.workers} work_mem={'Python peak' if a.work_mem is None else a.work_mem}",
-          flush=True)
+    check_server(max((w for w in a.workers if w is not None), default=0))
+    print(f"workers={['default' if w is None else w for w in a.workers]} "
+          f"work_mem={'Python peak' if a.work_mem is None else a.work_mem}", flush=True)
     fmt = lambda x: f"{x:.3f}" if isinstance(x, float) else str(x)  # noqa: E731
 
     for setting in a.settings:
@@ -253,7 +264,8 @@ def main():
                 rows = list(csv.DictReader(f))
             if rows and list(rows[0].keys()) != HDR:
                 sys.exit(f"{out} has other columns; move it away first")
-            done = {(int(r["n"]), int(r["sql_workers"])) for r in rows}
+            done = {(int(r["n"]), None if r["sql_workers"] == "default" else int(r["sql_workers"]))
+                    for r in rows}
             stopped = ({"py"} if any(r["py_s"] == "TIMEOUT" for r in rows) else set()) | {
                 f"sql{r['sql_workers']}" for r in rows if r["sql_s"] == "TIMEOUT"}
         else:
@@ -286,7 +298,8 @@ def main():
                 else:
                     rows_sql, rows_py, missing = ("NA",) * 3
                 line = ([setting, str(n), str(rows_sql), fmt(sql)] + py_cols
-                        + [f"{peak:.0f}" if peak else "NA", str(work_mem), str(w), str(launched),
+                        + [f"{peak:.0f}" if peak else "NA", str(work_mem),
+                           "default" if w is None else str(w), str(launched),
                            str(rows_py), str(missing), load_start, loadavg()])
                 with out.open("a") as f:
                     f.write(",".join(line) + "\n")

@@ -1,0 +1,20 @@
+date: 2026-11-09 06:41:14 -0600
+host: Linux 6.8.0-138-generic #138~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Fri Aug  7 13:43:15 UTC  x86_64 GNU/Linux
+CPU(s):                                  20
+Model name:                              Intel(R) Xeon(R) Silver 4114 CPU @ 2.20GHz
+Thread(s) per core:                      2
+Core(s) per socket:                      10
+Socket(s):                               1
+MemTotal:       97331596 kB
+physical cores: 10
+PostgreSQL 18.6 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, 64-bit
+jit = on
+max_parallel_workers = 8
+max_parallel_workers_per_gather = 2
+max_worker_processes = 16
+parallel_leader_participation = on
+shared_buffers = 16384 8kB
+wal_level = replica
+work_mem = 4096 kB
+python: Python 3.10.12
+scikit-learn 1.7.2 | numpy 2.2.6 | scipy 1.15.3 | psycopg2 2.9.13

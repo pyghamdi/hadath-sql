@@ -50,27 +50,39 @@ HadathSQL's, the (doc_id, term) pairs are the same), and import with `COPY`.
 - Both weights tables are UNLOGGED (no write-ahead log): the times measure computing
   the weights, not logging the rows written. UNLOGGED is the default of
   `hsql_create_tf_idf_tbl`.
-- PostgreSQL uses all cores: `--workers` parallel workers (default: physical cores - 1,
-  since the query's own process works too), set per session and as the
-  `parallel_workers` parameter of `sp_docs`. The server needs
-  `max_worker_processes` >= the number of workers in `postgresql.conf` (default 8;
-  restart needed); the script stops otherwise. Workers actually started are recorded
-  per size (`sql_workers_launched`); for small tables the planner may start none.
+- Parallel workers: by default PostgreSQL keeps its configuration (up to 2 workers per
+  query, started by the planner from the size of the table's main storage).
+  `--workers n` sets `max_parallel_workers_per_gather` and `max_parallel_workers` for
+  the session and the `parallel_workers` parameter of `sp_docs`; for n > 8 the server
+  needs `max_worker_processes` >= n in `postgresql.conf` (restart needed), and the
+  script stops otherwise. Workers actually started are recorded per size
+  (`sql_workers_launched`).
 - `work_mem` is set per size to the peak memory of the Python process at that size
   (`py_peak_mb`; Python runs first), unless `--work-mem` fixes it.
-- Sizes: Synthetic-Tweets 125 to 256,000, Synthetic-News 125 to 64,000 (doubling);
-  median of up to 3 runs (1 run when a run takes 60 s or more); 30-minute limit.
-- Results: `results_tfidf_synthetic_tweets.csv`, `results_tfidf_synthetic_news.csv`.
-- Requires `pip install psycopg2-binary PyStemmer scikit-learn`.
+- Sizes: Synthetic-Tweets 125 to 1,024,000, Synthetic-News 125 to 256,000 (doubling);
+  median of up to 3 runs (1 run when a run takes 60 s or more); 30-minute limit per run
+  (`--timeout 0`: none).
+- Requires `pip install psycopg2-binary PyStemmer scikit-learn`; the figure:
+  `plot_tfidf.py` (matplotlib, LaTeX).
+- `--worker-sweep` (0, 1, 2, 4, and physical cores - 1 workers at the largest sizes)
+  exists but was not run.
 
-- Worker sweep (`--worker-sweep`): at the largest size of each dataset, HadathSQL with
-  0, 1, 2 (PostgreSQL's default), 4, and physical cores - 1 workers; scikit-learn runs
-  once per size. 0 workers compares one PostgreSQL process with one Python process
-  (no parallelism); the other values show how the time falls as workers are added.
-  Results: `results_tfidf_workers_<setting>.csv`.
+Server runs (2026-11-09; machine and settings in `machine_tfidf.txt`):
 
-Run on the server (not at the same time as another sweep), one after the other:
-`nohup sh -c 'python3 run_tfidf_comparison.py && python3 run_tfidf_comparison.py --worker-sweep' > sweep_tfidf.log 2>&1 &`
+1. All cores: `python3 run_tfidf_comparison.py --workers 9` (sizes up to 256,000 tweets
+   and 64,000 news documents, before the larger sizes were added); results renamed to
+   `results_tfidf_w9_<setting>.csv`, log `sweep_tfidf_w9.log` (not tracked).
+2. Default workers: `python3 run_tfidf_comparison.py`, then the largest news size again
+   without a time limit (`--settings synthetic_news --sizes 256000 --timeout 0`);
+   results `results_tfidf_<setting>.csv`, log `sweep_tfidf_default.log` (not tracked).
+
+Results (default workers): HadathSQL leads by 0.96-1.3x on tweets and 1.15-1.4x on news
+while the planner starts no workers (tweets up to 64,000, news up to 8,000); with the 2
+default workers, about 1.55x on tweets up to 1,024,000 documents and 2.2x to 3.9x on
+news up to 256,000. Nine workers take the same time as two wherever two start.
+
+Prototype not adopted: removing the aggregation and join on doc_id from the TF-IDF query
+(`proto_tfidf_total.sql`, `proto_tfidf_total.py`, `proto_tfidf_total_results.txt`).
 
 ### Clustering stage
 
