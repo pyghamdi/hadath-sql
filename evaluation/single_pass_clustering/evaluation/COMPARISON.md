@@ -63,8 +63,14 @@ HadathSQL's, the (doc_id, term) pairs are the same), and import with `COPY`.
 - Results: `results_tfidf_synthetic_tweets.csv`, `results_tfidf_synthetic_news.csv`.
 - Requires `pip install psycopg2-binary PyStemmer scikit-learn`.
 
-Run on the server (not at the same time as another sweep):
-`nohup python3 run_tfidf_comparison.py > sweep_tfidf.log 2>&1 &`
+- Worker sweep (`--worker-sweep`): at the largest size of each dataset, HadathSQL with
+  0, 1, 2 (PostgreSQL's default), 4, and physical cores - 1 workers; scikit-learn runs
+  once per size. 0 workers compares one PostgreSQL process with one Python process
+  (no parallelism); the other values show how the time falls as workers are added.
+  Results: `results_tfidf_workers_<setting>.csv`.
+
+Run on the server (not at the same time as another sweep), one after the other:
+`nohup sh -c 'python3 run_tfidf_comparison.py && python3 run_tfidf_comparison.py --worker-sweep' > sweep_tfidf.log 2>&1 &`
 
 ### Clustering stage
 

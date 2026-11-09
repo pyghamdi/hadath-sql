@@ -35,11 +35,19 @@ dataset. After the runs, the two tables are compared on their (doc_id, term) pai
 which must be the same; the weights differ, since TfidfVectorizer uses its own
 default formula (see tfidf_python.py).
 
-  python3 run_tfidf_comparison.py                       # full sweep
+  python3 run_tfidf_comparison.py                       # size sweep, all cores
+  python3 run_tfidf_comparison.py --worker-sweep        # worker sweep, largest sizes
   python3 run_tfidf_comparison.py --settings synthetic_news --sizes 125 250 --reps 1
 
-Appends one line per point to results_tfidf_<setting>.csv and skips points already
-in it, so an interrupted sweep resumes where it stopped.
+Worker sweep (--worker-sweep): at the largest size of each dataset, HadathSQL with
+0, 1, 2 (PostgreSQL's default), 4, and physical cores - 1 workers; scikit-learn runs
+once per size, since it cannot use workers. It shows how much of HadathSQL's time
+comes from parallelism (0 workers: one PostgreSQL process against one Python
+process) and how the time falls as workers are added.
+
+Appends one line per (size, workers) to results_tfidf_<setting>.csv (worker sweep:
+results_tfidf_workers_<setting>.csv) and skips points already in it, so an
+interrupted sweep resumes where it stopped.
 Connection: PGHOST, PGPORT, PGUSER, PGDATABASE (defaults as in run_point.sh:
 localhost 54329 test hadath). The database must have HadathSQL installed
 (setup_db.sh). Requires psycopg2, PyStemmer, and scikit-learn.
@@ -100,10 +108,16 @@ def psql(*args):
                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=HERE)
 
 
-def generate(setting, n, workers):
+def generate(setting, n):
     gen = [x for k, v in GEN[setting].items() for x in ("-v", f"{k}={v}")]
     psql("-v", f"n={n}", "-v", "topics=50", "-v", "seed=0.42", *gen, "-f", "gen_synthetic_data.sql")
-    psql("-c", f"ALTER TABLE sp_docs SET (parallel_workers = {workers})", "-c", "VACUUM ANALYZE sp_docs")
+    psql("-c", "VACUUM ANALYZE sp_docs")
+
+
+def set_table_workers(workers):
+    """parallel_workers storage parameter of sp_docs, so that the planner does not use
+    fewer workers than allowed because the table is small."""
+    psql("-c", f"ALTER TABLE sp_docs SET (parallel_workers = {workers})")
 
 
 def session_options(timeout, workers, work_mem_mb):
@@ -205,63 +219,78 @@ def check_server(workers):
 
 
 def main():
+    default_workers = max(physical_cores() - 1, 0)
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--settings", nargs="+", default=list(GEN))
     ap.add_argument("--sizes", nargs="+", type=int, help="override the sizes of every setting")
-    ap.add_argument("--workers", type=int, default=max(physical_cores() - 1, 0),
-                    help="parallel workers for PostgreSQL (default: physical cores - 1)")
+    ap.add_argument("--workers", nargs="+", type=int, default=[default_workers],
+                    help="parallel workers for PostgreSQL, one or more values "
+                         f"(default: physical cores - 1 = {default_workers})")
+    ap.add_argument("--worker-sweep", action="store_true",
+                    help="worker sweep: workers 0, 1, 2, 4, and physical cores - 1, at the "
+                         "largest size of each setting, into results_tfidf_workers_<setting>.csv")
     ap.add_argument("--work-mem", type=int, metavar="MB",
                     help="fixed work_mem in MB (default: Python's peak memory at each size)")
     ap.add_argument("--reps", type=int, default=3)
     ap.add_argument("--rep-max", type=float, default=60)
     ap.add_argument("--timeout", type=int, default=1800)
-    ap.add_argument("--prefix", default="results_tfidf_")
+    ap.add_argument("--prefix")
     a = ap.parse_args()
-    check_server(a.workers)
+    if a.worker_sweep:
+        a.workers = sorted({0, 1, 2, 4, default_workers})
+    a.prefix = a.prefix or ("results_tfidf_workers_" if a.worker_sweep else "results_tfidf_")
+    check_server(max(a.workers))
     print(f"workers={a.workers} work_mem={'Python peak' if a.work_mem is None else a.work_mem}",
           flush=True)
+    fmt = lambda x: f"{x:.3f}" if isinstance(x, float) else str(x)  # noqa: E731
 
     for setting in a.settings:
         out = HERE / f"{a.prefix}{setting}.csv"
         done = set()
+        stopped = set()
         if out.exists():
             with out.open() as f:
                 rows = list(csv.DictReader(f))
             if rows and list(rows[0].keys()) != HDR:
                 sys.exit(f"{out} has other columns; move it away first")
-            done = {int(r["n"]) for r in rows}
-            stopped = {m for r in rows for m in ("sql", "py") if r[f"{m}_s"] == "TIMEOUT"}
+            done = {(int(r["n"]), int(r["sql_workers"])) for r in rows}
+            stopped = ({"py"} if any(r["py_s"] == "TIMEOUT" for r in rows) else set()) | {
+                f"sql{r['sql_workers']}" for r in rows if r["sql_s"] == "TIMEOUT"}
         else:
             out.write_text(",".join(HDR) + "\n")
-            stopped = set()
-        for n in a.sizes or SIZES[setting]:
-            if n in done:
+        sizes = a.sizes or ([SIZES[setting][-1]] if a.worker_sweep else SIZES[setting])
+        for n in sizes:
+            todo = [w for w in a.workers if (n, w) not in done]
+            if not todo:
                 continue
             load_start = loadavg()
-            generate(setting, n, a.workers)
+            generate(setting, n)
+            # scikit-learn runs in one thread: measured once per size, for all worker counts.
             py = ("NA" if "py" in stopped else
                   measure(lambda: run_python(a.timeout), "total_s", a.reps, a.rep_max))
+            if py == "TIMEOUT":
+                stopped.add("py")
             peak = py["peak_mb"] if isinstance(py, dict) else None
             work_mem = a.work_mem or (math.ceil(peak) if peak else 1024)
-            launched = workers_launched(a.workers, work_mem)
-            sql = ("NA" if "sql" in stopped else
-                   measure(lambda: run_sql(a.timeout, a.workers, work_mem), None, a.reps, a.rep_max))
-            for m, r in (("sql", sql), ("py", py)):
-                if r == "TIMEOUT":
-                    stopped.add(m)
-            if sql not in ("NA", "TIMEOUT") and py not in ("NA", "TIMEOUT"):
-                rows_sql, rows_py, missing = compare()
-            else:
-                rows_sql, rows_py, missing = ("NA",) * 3
-            fmt = lambda x: f"{x:.3f}" if isinstance(x, float) else str(x)  # noqa: E731
             py_cols = ([fmt(py["total_s"])] + [fmt(py[s]) for s in PY_STEPS]
                        if isinstance(py, dict) else [py] * (1 + len(PY_STEPS)))
-            line = ([setting, str(n), str(rows_sql), fmt(sql)] + py_cols
-                    + [f"{peak:.0f}" if peak else "NA", str(work_mem), str(a.workers), str(launched),
-                       str(rows_py), str(missing), load_start, loadavg()])
-            with out.open("a") as f:
-                f.write(",".join(line) + "\n")
-            print(",".join(line), flush=True)
+            for w in todo:
+                set_table_workers(w)
+                launched = workers_launched(w, work_mem)
+                sql = ("NA" if f"sql{w}" in stopped else
+                       measure(lambda: run_sql(a.timeout, w, work_mem), None, a.reps, a.rep_max))
+                if sql == "TIMEOUT":
+                    stopped.add(f"sql{w}")
+                if sql not in ("NA", "TIMEOUT") and py not in ("NA", "TIMEOUT"):
+                    rows_sql, rows_py, missing = compare()
+                else:
+                    rows_sql, rows_py, missing = ("NA",) * 3
+                line = ([setting, str(n), str(rows_sql), fmt(sql)] + py_cols
+                        + [f"{peak:.0f}" if peak else "NA", str(work_mem), str(w), str(launched),
+                           str(rows_py), str(missing), load_start, loadavg()])
+                with out.open("a") as f:
+                    f.write(",".join(line) + "\n")
+                print(",".join(line), flush=True)
 
 
 if __name__ == "__main__":
