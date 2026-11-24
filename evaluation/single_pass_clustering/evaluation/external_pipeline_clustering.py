@@ -36,7 +36,17 @@ to the same cluster (run_comparison_python.py checks this):
 
 Prints one JSON object with the time of each step in seconds (connection setup and
 Python start-up are not included), the numbers of documents, weights rows, and
-clusters, and the peak resident memory of the process in MB (peak_mb). If the
+clusters, the peak resident memory of the process in MB (peak_mb), and the volume of
+data transferred in each direction in MB (export_mb, import_mb), so that the cost of
+the transfers can be estimated for any network bandwidth. export_mb is the size of the
+rows that PostgreSQL sends in its text protocol (DataRow messages: 7 bytes per row and
+4 bytes plus the text of each value), computed from the rows received; import_mb is
+the size of the COPY data sent.
+
+Placement: run on the database server with PGHOST=localhost, the transfers cross the
+loopback interface, which is the most favorable case for the pipeline: the times
+include converting the rows to and from PostgreSQL's text format, but almost no
+network cost. If the
 clustering takes longer than --timeout seconds, it stops, prints {"timeout": true},
 and exits with status 3.
 Connection: libpq environment variables (PGHOST, PGPORT, PGUSER, PGDATABASE).
@@ -57,6 +67,13 @@ class Timeout(Exception):
     pass
 
 
+def row_bytes(values):
+    """Size of one DataRow message of PostgreSQL's protocol in text format: message
+    type (1), length (4), number of columns (2), and per value its length (4) and
+    text. Floats are sent in their shortest exact form, as repr writes them."""
+    return 7 + sum(4 + len((repr(v) if isinstance(v, float) else str(v)).encode()) for v in values)
+
+
 def export(conn, docs_tbl, ts_col, tfidf_tbl):
     """Document ids in timestamp order, and each document's (term, weight) rows."""
     with conn.cursor() as cur:
@@ -67,7 +84,7 @@ def export(conn, docs_tbl, ts_col, tfidf_tbl):
     vectors = {}
     for doc_id, term, weight in rows:
         vectors.setdefault(doc_id, []).append((term, weight))
-    return order, vectors, len(rows)
+    return order, vectors, rows
 
 
 def cluster(order, vectors, threshold, deadline):
@@ -125,11 +142,14 @@ def cluster(order, vectors, threshold, deadline):
 
 def import_clusters(conn, out_tbl, assignments, centroids, sum_sq, sizes):
     """Writes the clusters into the driver's output tables (one transaction)."""
+    sent = []
+
     def copy(cur, table, columns, lines):
         buf = io.StringIO()
         buf.writelines(lines)
         buf.seek(0)
         cur.copy_expert(f'COPY "{table}" ({columns}) FROM STDIN', buf)
+        sent.append(buf)
 
     with conn.cursor() as cur:
         cur.execute("SET client_min_messages = warning")
@@ -147,6 +167,7 @@ def import_clusters(conn, out_tbl, assignments, centroids, sum_sq, sizes):
             cur.execute("SELECT setval(pg_get_serial_sequence(%s, 'cid'), %s)",
                         (f'"{out_tbl}"', len(sizes)))
     conn.commit()
+    return sent
 
 
 def peak_rss_mb():
@@ -164,10 +185,14 @@ def run(threshold, docs_tbl="sp_docs", ts_col="ts", tfidf_tbl="sp_tfidf", out_tb
         t1 = time.perf_counter()
         assignments, centroids, sum_sq, sizes = cluster(order, vectors, threshold, t0 + timeout)
         t2 = time.perf_counter()
-        import_clusters(conn, out_tbl, assignments, centroids, sum_sq, sizes)
+        sent = import_clusters(conn, out_tbl, assignments, centroids, sum_sq, sizes)
         t3 = time.perf_counter()
+        # Volumes, computed after the timed steps so that they do not add to the times.
+        export_bytes = sum(row_bytes((d,)) for d in order) + sum(row_bytes(r) for r in rows)
+        import_bytes = sum(len(buf.getvalue().encode()) for buf in sent)
         return dict(export_s=t1 - t0, cluster_s=t2 - t1, import_s=t3 - t2, total_s=t3 - t0,
-                    docs=len(order), rows=rows, clusters=len(sizes), peak_mb=peak_rss_mb())
+                    docs=len(order), rows=len(rows), clusters=len(sizes), peak_mb=peak_rss_mb(),
+                    export_mb=export_bytes / 1e6, import_mb=import_bytes / 1e6)
     finally:
         conn.close()
 

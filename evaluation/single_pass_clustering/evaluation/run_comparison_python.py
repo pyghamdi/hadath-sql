@@ -11,7 +11,8 @@ Then, for each threshold, time
                                                    'sp_tfidf', 'drv', <th>, TRUE)
   python  python3 external_pipeline_clustering.py --threshold <th> --out dpy
           (a separate process, as an application; its time is the sum of its
-          export, clustering, and import steps, each also recorded)
+          export, clustering, and import steps, each also recorded, with the
+          volume of data each transfer moves, py_export_mb and py_import_mb)
 
 and check that both assign every document to the same cluster ("mismatches": the
 number of documents whose cluster differs; it must be 0).
@@ -27,6 +28,9 @@ and threshold ("timeout").
 
 Appends one line per (size, threshold) to results_comparison_python_<setting>.csv and
 skips points already in it, so an interrupted sweep resumes where it stopped.
+Run it on the database server with PGHOST=localhost (the default): the pipeline then
+transfers its data over the loopback interface, the most favorable placement for it,
+so its export and import times are a lower bound for a pipeline on another machine.
 Connection: PGHOST, PGPORT, PGUSER, PGDATABASE (defaults as in run_point.sh:
 localhost 54329 test hadath). The database must have HadathSQL installed
 (setup_db.sh). Requires psycopg2.
@@ -58,7 +62,7 @@ SIZES = {
 THRESHOLDS = ["0", "0.2", "0.4", "0.6", "0.8", "1"]
 PY_STEPS = ["export_s", "cluster_s", "import_s"]
 HDR = (["setting", "n", "threshold", "clusters", "driver_s", "py_s"] + ["py_" + s for s in PY_STEPS]
-       + ["py_peak_mb", "mismatches", "load_start", "load_end"])
+       + ["py_peak_mb", "py_export_mb", "py_import_mb", "mismatches", "load_start", "load_end"])
 
 
 def loadavg():
@@ -177,7 +181,9 @@ def main():
                 fmt = lambda s: "timeout" if s is None else f"{s:.3f}"
                 row = [setting, n, th, clusters, fmt(drv), fmt(py and py["total_s"])]
                 row += [fmt(py and py[s]) for s in PY_STEPS]
-                row += ["NA" if py is None else f"{py['peak_mb']:.0f}", mism, start, loadavg()]
+                row += ["NA" if py is None else f"{py['peak_mb']:.0f}"]
+                row += ["NA" if py is None else f"{py[k]:.2f}" for k in ("export_mb", "import_mb")]
+                row += [mism, start, loadavg()]
                 with out.open("a", newline="") as f:
                     csv.writer(f).writerow(row)
                 print(*row, sep=",", flush=True)
