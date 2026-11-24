@@ -10,7 +10,7 @@ the datasets and the server setup used here as well.
 | HadathSQL driver (`single_pass_clustering/sp_clustering.sql`; key `driver`) | ready |
 | Standard SQL CTE (`prep_cte_standard.sql`, `run_cte_standard.sql`; key `cte-standard`) | ready (`comparison_cte.conf`) |
 | External pipeline, TF-IDF stage (`tfidf_python.py`, scikit-learn `TfidfVectorizer`) | ready (`run_tfidf_comparison.py`) |
-| External pipeline, clustering stage (`pipeline_python.py`) | to be written |
+| External pipeline, clustering stage (`external_pipeline_clustering.py`) | ready (`run_comparison_python.py`) |
 
 ## Standard SQL CTE
 
@@ -33,6 +33,30 @@ Results: `results_comparison_cte_synthetic_tweets.csv`,
 `results_comparison_cte_synthetic_news.csv`. A partial
 run on the laptop (2026-10-20, stopped when the laptop shut down) is kept as
 `results_cte_laptop_partial_*.csv`; it is preliminary and is to be redone on the server.
+
+### TF-IDF stage in standard SQL (`tfidf_standard.sql`, `run_tfidf_standard.py`)
+
+The CTE above starts from HadathSQL's weights table, whose terms come from
+`to_tsvector`, which is not standard SQL. `tfidf_standard.sql` computes the same
+weights with standard SQL only (paper, Appendix "TF-IDF Stage in Standard SQL"):
+lowercasing with `LOWER`, splitting at every character that is not an ASCII letter
+or digit (a recursive CTE generates the character positions, a running count of
+separators numbers the words, `SUBSTRING` cuts them out), stop words removed with
+`NOT EXISTS` against `std_stopwords` (PostgreSQL's `english.stop`), and no stemming.
+On the synthetic datasets this gives the same terms as `to_tsvector`, so the weights
+are identical; `run_tfidf_standard.py` checks this at every size (`mismatches`,
+`max_abs_diff`).
+
+- Both methods create a regular (logged) table, since standard SQL has no UNLOGGED
+  tables; PostgreSQL's default configuration (up to 2 parallel workers).
+- Sizes as in the TF-IDF comparison; median of up to 3 runs (one run when a run
+  takes 60 s or more); 15-minute limit per run (`--timeout 900`).
+- Run: `python3 run_tfidf_standard.py --timeout 900` (or, without a Python
+  environment, `uv run --no-project --with psycopg2-binary python run_tfidf_standard.py --timeout 900`).
+
+Results: `results_tfidf_standard_synthetic_*.csv` (server, to be run). A laptop run
+(2026-11-23) is kept as `results_tfidf_standard_laptop_synthetic_*.csv`; it is
+preliminary and is to be redone on the server.
 
 ## External pipeline
 
@@ -86,9 +110,28 @@ Prototype not adopted: removing the aggregation and join on doc_id from the TF-I
 
 ### Clustering stage
 
-To be written (`pipeline_python.py`). Since the scikit-learn weights differ from
-HadathSQL's, its clusters cannot be checked against HadathSQL's unless it uses the
-same weights (open decision, see the paper).
+`external_pipeline_clustering.py` reads HadathSQL's weights table (`sp_tfidf`) and the
+document order (`sp_docs` by `ts`), clusters in pure Python with the driver's rules
+(candidates through a term -> clusters dictionary plus the newest cluster, cosine with
+the summed centroid, ties to the newest cluster, `>=` threshold, summed centroids with
+the incremental squared norm), and writes the clusters into tables with the driver's
+schema (`hsql_create_tbls_for_single_pass_clustering`, then `COPY`). Since both start
+from the same weights, the clusters must be the same; `run_comparison_python.py` checks
+this at every point (`mismatches`).
+
+`run_comparison_python.py` times it against `hsql_single_pass_clustering_tfidf` on the
+sizes and thresholds of the ablation (Synthetic-Tweets 125 to 64,000, Synthetic-News 125
+to 16,000; thresholds 0 to 1 by 0.2), with the ablation's repetitions, 30-minute limit,
+and dropout rule; the TF-IDF table is built once per size and not timed. Results:
+`results_comparison_python_<setting>.csv` (server, to be run), with the time of each
+step of the pipeline (export, clustering, import) and its peak memory.
+
+  python3 run_comparison_python.py
+  uv run --no-project --with psycopg2-binary python run_comparison_python.py
+
+Laptop check (2026-11-24, single runs, not results): 0 mismatches at every point tried;
+the pipeline was faster than the driver, e.g. 1.6 s against 16.6 s at 16,000 tweets
+(threshold 0.2) and 18.9 s against 70.4 s at 4,000 news documents (threshold 0.2).
 
 ## How to run (remote server)
 

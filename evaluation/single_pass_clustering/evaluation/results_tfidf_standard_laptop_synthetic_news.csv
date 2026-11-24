@@ -1,0 +1,13 @@
+setting,n,rows,hadath_s,standard_s,ratio,std_rows,mismatches,max_abs_diff,load_start,load_end
+synthetic_news,125,40665,0.180,3.671,20.4,40665,0,0.00e+00,4.53,4.22
+synthetic_news,250,81452,0.369,8.592,23.3,81452,0,0.00e+00,4.22,3.85
+synthetic_news,500,162946,0.785,18.058,23.0,162946,0,0.00e+00,3.85,3.24
+synthetic_news,1000,325870,1.602,34.615,21.6,325870,0,0.00e+00,3.24,3.31
+synthetic_news,2000,651503,3.198,97.882,30.6,651503,0,0.00e+00,3.31,4.59
+synthetic_news,4000,NA,6.551,timeout,NA,NA,NA,NA,4.59,2.00
+synthetic_news,8000,NA,13.461,timeout,NA,NA,NA,NA,2.00,3.36
+synthetic_news,16000,NA,19.804,timeout,NA,NA,NA,NA,3.36,2.94
+synthetic_news,32000,NA,40.039,timeout,NA,NA,NA,NA,2.94,2.66
+synthetic_news,64000,NA,76.805,timeout,NA,NA,NA,NA,2.66,3.04
+synthetic_news,128000,NA,158.367,timeout,NA,NA,NA,NA,3.04,2.17
+synthetic_news,256000,NA,330.217,timeout,NA,NA,NA,NA,2.17,1.78
