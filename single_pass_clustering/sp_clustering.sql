@@ -154,7 +154,8 @@ hsql_single_pass_clustering_tfidf
 --------------------------------------------------------------------------------
 Runs single-pass clustering over the documents in `input_tbl`, using the TF-IDF
 weights already stored in `tfidf_tbl` (as built by `hsql_create_tf_idf_tbl`).
-Documents are processed in the order given by `ts_col` (typically a timestamp).
+Documents are processed in the order given by `ts_col` (typically a timestamp),
+ties broken by `doc_id_col`.
 Each document is either assigned to the most similar existing cluster (when
 cosine similarity >= threshold) or used to seed a new cluster.
 
@@ -293,10 +294,12 @@ BEGIN
     RAISE NOTICE 'Creating output tables %, %, %...', output_tbl, centroid_tbl, assignments_tbl;
     PERFORM hsql_create_tbls_for_single_pass_clustering(output_tbl, centroid_tbl, assignments_tbl, overwrite_output);
 
-    -- Drive the main loop: stream document ids in the requested chronological order.
+    -- Drive the main loop: stream document ids in the requested chronological order;
+    -- documents with the same timestamp are taken in doc_id order, so the order, and
+    -- hence the clusters, are deterministic.
     retrieve_documents_query := format(
-        'SELECT %I FROM %I ORDER BY %I',
-        doc_id_col, input_tbl, ts_col
+        'SELECT %I FROM %I ORDER BY %I, %I',
+        doc_id_col, input_tbl, ts_col, doc_id_col
     );
 
     -- Pick the best-matching cluster for the document whose id is bound to $1.

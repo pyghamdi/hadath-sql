@@ -107,10 +107,12 @@ BEGIN
     RAISE NOTICE 'Creating output tables %, %, %...', output_tbl, centroid_tbl, assignments_tbl;
     PERFORM hsql_spc_hadathsql_noopt_tbls(output_tbl, centroid_tbl, assignments_tbl, overwrite_output);
 
-    -- Drive the main loop: stream document ids in the requested chronological order.
+    -- Drive the main loop: stream document ids in the requested chronological order;
+    -- documents with the same timestamp are taken in doc_id order, so the order, and
+    -- hence the clusters, are deterministic.
     retrieve_documents_query := format(
-        'SELECT %I FROM %I ORDER BY %I',
-        doc_id_col, input_tbl, ts_col
+        'SELECT %I FROM %I ORDER BY %I, %I',
+        doc_id_col, input_tbl, ts_col, doc_id_col
     );
 
     -- Pick the best-matching cluster for the document whose id is bound to $1.
