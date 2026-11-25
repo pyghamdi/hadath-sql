@@ -261,6 +261,13 @@ and each centroid; join the most similar cluster if the similarity is at least t
 threshold (ties go to the newest cluster), otherwise start a new cluster; a centroid
 is the mean of its documents' vectors.
 
+The five drivers of the preliminary runs (Basic, Summed, Summed + indexed, Summed +
+indexed + prepared, Mean + indexed; `driver_variant_basic.sql`, `driver_variant_summed*.sql`,
+`driver_variant_mean_indexed.sql`) and their configuration `small_evaluation.conf` were
+removed from the repository on 2026-11-25, since neither the ablation nor the comparison
+uses them; they are in its history (last in commit 96b7946). Their results files and the
+records below are kept.
+
 | ID | Implementation | File | Per-document work |
 |---|---|---|---|
 | Basic | Basic driver, no optimization (formerly D1) | `driver_variant_basic.sql` (`hsql_spc_basic`) | No optimization: scans the TF-IDF table for the document's vector (no index); recomputes every centroid norm over the whole centroid table; stores running-mean centroids, so it rewrites the whole chosen centroid; 5 dynamic statements per document, parsed and planned every time; no statistics refresh, default planner settings. Per-document updates merged into one add-document statement since 2026-10-20 (formerly 5 statements per document) |

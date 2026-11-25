@@ -38,7 +38,6 @@ Replace `hadathdb` with your database name. The script expects a database that d
 | 6 | `spatial_partition/space_partition.sql` | `spatial_partition_id` type and `hsql_spatial_partition()` |
 | 7 | `event_type/event_type.sql` | `hsql_overlap()`, `hsql_has_keyword()`, `hsql_event_type()`, `hsql_train_event_type()`, and the `hsql_event_type_model` table |
 | 8 | `single_pass_clustering/sp_clustering.sql` | Single-pass clustering with built-in TF-IDF |
-| 9 | `single_pass_clustering/lsh_sp_clustering.sql` | LSH-accelerated variant |
 
 > **Note:** The install script must be run with `psql`. Plain `CREATE` statements sent through other clients cannot resolve `\ir` includes.
 
@@ -61,7 +60,7 @@ hadath-sql/
 ├── time_partition/             # Temporal grid partitioning
 ├── spatial_partition/          # Web Mercator spatial grid partitioning
 ├── event_type/                 # Keyword match and classifier for events of a specific type
-├── single_pass_clustering/     # Leader clustering (+ LSH variant)
+├── single_pass_clustering/     # Leader clustering
 ├── dataset/                    # Sample corpora and loaders (see dataset/README.md)
 └── cfunc/                      # Optional C extension with the aggregates in C (see cfunc/README.md)
 ```

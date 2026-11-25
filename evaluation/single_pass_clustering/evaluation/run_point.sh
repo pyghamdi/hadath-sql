@@ -6,12 +6,7 @@
 # Usage: run_point.sh <setting> <n> <threshold> <methods> [timeout_s]
 #   setting: synthetic_tweets | synthetic_news (datasets of gen_synthetic_data.sql)
 #   methods: comma-separated subset of
-#            driver,noidx,mean,noprep,noopt,d1,sum,sumidx,sumidxp,d2,cte-standard,cte-array
-#     d1 = basic driver, no optimization (reads an unindexed copy of the TF-IDF table)
-#     sum = summed driver: basic driver with summed centroids (unindexed copy too)
-#     sumidx = summed + indexed driver: summed driver with the indexing optimization
-#     sumidxp = summed + indexed + prepared: sumidx with prepared statements only
-#     d2 = mean + indexed driver: basic driver + indexes and stored norms, mean centroids
+#            driver,noidx,mean,noprep,noopt,cte-standard,cte-array
 #     driver = HadathSQL driver, hsql_single_pass_clustering_tfidf (sp_clustering.sql)
 #     noidx  = HadathSQL driver without indexes (reads the unindexed copy)
 #     mean   = HadathSQL driver without summed centroids (running means)
@@ -19,7 +14,9 @@
 #     noopt  = HadathSQL driver without all three (reads the unindexed copy)
 #     cte-array    = Array CTE (non-standard; input preparation included in its time)
 #     cte-standard = Standard SQL CTE (input preparation included in its time)
-# Prints one CSV line:
+# Prints one CSV line (the columns d1_s, sum_s, sumidx_s, sumidxp_s, and d2_s belong to
+# the drivers of the preliminary runs, which were removed from the repository; they are
+# kept, always NA, so that the results files keep one format):
 #   setting,n,threshold,clusters,tfidf_s,d1_s,sum_s,sumidx_s,sumidxp_s,d2_s,driver_s,noidx_s,mean_s,noprep_s,noopt_s,cte-array_s,cte-standard_s,mismatches,load_start,load_end
 # Each method is run REPS times (default 3) while its runs take less than REP_MAX
 # seconds (default 60), and the median time is reported; slower runs are measured once.
@@ -99,7 +96,7 @@ psql -c "VACUUM ANALYZE sp_docs" >/dev/null
 # TF-IDF, built once and indexed on doc_id (timed separately, not part of any method).
 tfidf=$(timed -c "SELECT hsql_create_tf_idf_tbl('sp_docs','doc_id','txt','sp_tfidf',TRUE)" \
               -c "CREATE INDEX ON sp_tfidf (doc_id)" -c "ANALYZE sp_tfidf")
-# Unindexed copy for the basic driver, which uses no index on doc_id (not timed).
+# Unindexed copy for the variants without indexes (not timed).
 psql -c "DROP TABLE IF EXISTS sp_tfidf_noidx" -c "CREATE TABLE sp_tfidf_noidx AS SELECT * FROM sp_tfidf" \
      -c "ANALYZE sp_tfidf_noidx" >/dev/null
 
@@ -109,36 +106,24 @@ has noidx && noidx=$(measure -c "SELECT hsql_spc_hadathsql_noidx('sp_docs','doc_
 has mean && mean=$(measure -c "SELECT hsql_spc_hadathsql_mean('sp_docs','doc_id','ts','sp_tfidf','dmean',$TH,TRUE)")
 has noprep && noprep=$(measure -c "SELECT hsql_spc_hadathsql_noprep('sp_docs','doc_id','ts','sp_tfidf','dnoprep',$TH,TRUE)")
 has noopt && noopt=$(measure -c "SELECT hsql_spc_hadathsql_noopt('sp_docs','doc_id','ts','sp_tfidf_noidx','dnoopt',$TH,TRUE)")
-has d2 && d2=$(measure -c "SELECT hsql_spc_mean_indexed('sp_docs','doc_id','ts','sp_tfidf','d2',$TH,TRUE)")
-has d1 && d1=$(measure -c "SELECT hsql_spc_basic('sp_docs','doc_id','ts','sp_tfidf_noidx','d1',$TH,TRUE)")
-has sum && sum=$(measure -c "SELECT hsql_spc_summed('sp_docs','doc_id','ts','sp_tfidf_noidx','dsum',$TH,TRUE)")
-has sumidx && sumidx=$(measure -c "SELECT hsql_spc_sumidx('sp_docs','doc_id','ts','sp_tfidf','dsumidx',$TH,TRUE)")
-has sumidxp && sumidxp=$(measure -c "SELECT hsql_spc_sumidxp('sp_docs','doc_id','ts','sp_tfidf','dsumidxp',$TH,TRUE)")
 has cte-array && cte_array=$(measure -v th="$TH" -f prep_cte_array.sql -f run_cte_array.sql)
 has cte-standard && cte_standard=$(measure -v th="$TH" -f prep_cte_standard.sql -f run_cte_standard.sql)
 
 # Equivalence with a reference for every method that completed: the HadathSQL driver if it ran,
 # otherwise the first of its ablation variants (without prepared statements, with mean
-# centroids, without indexes) that ran, otherwise the basic, summed, or summed + indexed driver.
+# centroids, without indexes, without all three) that ran.
 num='^[0-9.]+$'
 clusters=NA; mism=0; ref=""
-if [[ "$driver" =~ $num ]]; then ref=drv; elif [[ "$noprep" =~ $num ]]; then ref=dnoprep; elif [[ "$mean" =~ $num ]]; then ref=dmean; elif [[ "$noidx" =~ $num ]]; then ref=dnoidx; elif [[ "$noopt" =~ $num ]]; then ref=dnoopt; elif [[ "$d1" =~ $num ]]; then ref=d1; elif [[ "$sum" =~ $num ]]; then ref=dsum; elif [[ "$sumidx" =~ $num ]]; then ref=dsumidx; fi
-# Assignments table of a driver's output prefix: the HadathSQL driver and its generated
-# ablation variants write <prefix>_assignments; the earlier drivers of the preliminary
-# runs write <prefix>_cluster_assignments.
-asg() { case $1 in drv|dnoidx|dmean|dnoprep|dnoopt) echo "${1}_assignments" ;; *) echo "${1}_cluster_assignments" ;; esac; }
+if [[ "$driver" =~ $num ]]; then ref=drv; elif [[ "$noprep" =~ $num ]]; then ref=dnoprep; elif [[ "$mean" =~ $num ]]; then ref=dmean; elif [[ "$noidx" =~ $num ]]; then ref=dnoidx; elif [[ "$noopt" =~ $num ]]; then ref=dnoopt; fi
+# Assignments table of a driver's output prefix.
+asg() { echo "${1}_assignments"; }
 if [ -n "$ref" ]; then
   clusters=$(psql -At -c "SELECT COUNT(DISTINCT cid) FROM $(asg $ref)")
   chk() { psql -At -c "SELECT COUNT(*) FROM $(asg $ref) r FULL JOIN $1 x ON x.$2 = r.doc_id WHERE x.cid IS DISTINCT FROM r.cid"; }
-  [[ "$ref" != d1 && "$d1" =~ $num ]] && mism=$((mism + $(chk d1_cluster_assignments doc_id)))
-  [[ "$ref" != dsum && "$sum" =~ $num ]] && mism=$((mism + $(chk dsum_cluster_assignments doc_id)))
-  [[ "$ref" != dsumidx && "$sumidx" =~ $num ]] && mism=$((mism + $(chk dsumidx_cluster_assignments doc_id)))
-  [[ "$sumidxp" =~ $num ]] && mism=$((mism + $(chk dsumidxp_cluster_assignments doc_id)))
   [[ "$ref" != dnoidx && "$noidx" =~ $num ]] && mism=$((mism + $(chk $(asg dnoidx) doc_id)))
   [[ "$ref" != dmean && "$mean" =~ $num ]] && mism=$((mism + $(chk $(asg dmean) doc_id)))
   [[ "$ref" != dnoprep && "$noprep" =~ $num ]] && mism=$((mism + $(chk $(asg dnoprep) doc_id)))
   [[ "$ref" != dnoopt && "$noopt" =~ $num ]] && mism=$((mism + $(chk $(asg dnoopt) doc_id)))
-  [[ "$d2" =~ $num ]] && mism=$((mism + $(chk d2_cluster_assignments doc_id)))
   [[ "$cte_array" =~ $num ]] && mism=$((mism + $(chk cte_array_out did)))
   [[ "$cte_standard" =~ $num ]] && mism=$((mism + $(chk cte_rows_out did)))
 else

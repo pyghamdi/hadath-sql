@@ -1,3 +1,6 @@
+# Local-only code, not published (e.g. the LSH variant of single-pass clustering)
+/local/
+
 # Evaluation: scripts and results are tracked; database clusters and run logs stay local
 evaluation/**/pgdata/
 
