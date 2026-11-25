@@ -4,7 +4,7 @@
 # Within each (setting, threshold) series, a method that hits the time limit is not
 # run at larger sizes; a point during which the machine slept is measured again (up to
 # twice); a sweep that is interrupted resumes where it stopped (points already in the
-# CSV file are skipped). The results sections of ABLATION.md and COMPARISON.md are
+# CSV file are skipped). The results sections of ABLATION.md and STANDARD_SQL_COMPARISON.md are
 # regenerated after
 # every point.
 #

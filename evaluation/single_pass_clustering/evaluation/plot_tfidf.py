@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Figure of the TF-IDF comparison (COMPARISON.md, "TF-IDF stage"):
+"""Figure of the TF-IDF comparison (STANDARD_SQL_COMPARISON.md, "Python scripts: correctness checks only"):
 
   tfidf_sizes.pdf    time against the number of documents (log-log) and the lead of
                      HadathSQL (scikit-learn's time / HadathSQL's), one panel per

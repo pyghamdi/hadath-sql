@@ -1,5 +1,5 @@
 """TF-IDF stage: HadathSQL (hsql_create_tf_idf_tbl) against the Python pipeline
-(tfidf_python.py). See COMPARISON.md, "TF-IDF stage".
+(tfidf_python.py). See STANDARD_SQL_COMPARISON.md, "Python scripts: correctness checks only".
 
 For each dataset and size: generate sp_docs with gen_synthetic_data.sql (same
 settings and seed as run_point.sh), then time

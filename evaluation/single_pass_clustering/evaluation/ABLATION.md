@@ -3,7 +3,7 @@
 This file covers the ablation: the HadathSQL driver against variants of it that each
 lack one optimization, to be run on the remote server. The comparison of HadathSQL
 with standard SQL (the Standard SQL CTE) is a separate
-evaluation, in `COMPARISON.md`; both use the datasets and the server setup described
+evaluation, in `STANDARD_SQL_COMPARISON.md`; both use the datasets and the server setup described
 here. The runs made on the laptop while the drivers were developed are recorded
 under *Preliminary runs*.
 
@@ -145,7 +145,7 @@ Requirements: PostgreSQL with `psql` and `pg_isready`, bash, python3, perl, and 
    to `machine.txt` (for the setup section of the paper).
 4. `nohup bash sweep.sh > sweep_ablation.log 2>&1 &` runs the ablation (`ablation.conf`,
    the default config). Do not run another sweep (e.g. the comparison of
-   `COMPARISON.md`) at the same time: sweeps use the same tables and would also distort
+   `STANDARD_SQL_COMPARISON.md`) at the same time: sweeps use the same tables and would also distort
    each other's times.
 5. A sweep resumes where it stopped when rerun with the same command (points already in
    the CSV files are skipped). It checks the server before every point; if the server

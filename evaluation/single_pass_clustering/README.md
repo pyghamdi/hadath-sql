@@ -23,8 +23,9 @@ and Synthetic-News, in two separate evaluations:
 - `evaluation/ABLATION.md`: the ablation of the HadathSQL driver UDF, against variants
   that each lack one optimization (indexes, summed centroids, prepared statements);
   also the datasets, how to run on a server, and the preliminary laptop runs.
-- `evaluation/COMPARISON.md`: HadathSQL against other solutions: the Standard SQL CTE
-  (run on smaller data) and an external pipeline (to be defined).
+- `evaluation/STANDARD_SQL_COMPARISON.md`: HadathSQL against the same computation in
+  standard SQL: the recursive CTE (run on smaller data) and the TF-IDF stage in
+  standard SQL; the Python scripts in the folder only check the correctness of results.
 
 The folder also keeps the drivers and the Array CTE (non-standard) of the preliminary
 runs. All of them compute exactly the same clusters.
@@ -43,7 +44,7 @@ runs. All of them compute exactly the same clusters.
 - `setup_db.sh`: installs everything into an empty database (e.g. on the remote server)
   and records the machine configuration in `machine.txt`.
 - `run_point.sh`, `sweep.sh`, `render_results.py`: one point, a sweep (from a config), and the
-  results tables in `ABLATION.md` and `COMPARISON.md`.
+  results tables in `ABLATION.md` and `STANDARD_SQL_COMPARISON.md`.
 - `results_*.csv`: raw results.
 - `pgdata/`: the test PostgreSQL instance (port 54329, user `test`, database
   `hadath`). Start it with

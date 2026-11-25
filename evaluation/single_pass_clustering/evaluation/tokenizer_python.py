@@ -1,5 +1,5 @@
 """Python counterpart of PostgreSQL's to_tsvector('english', txt), used by the
-external Python pipeline of the comparison (COMPARISON.md).
+external Python pipeline of the comparison (STANDARD_SQL_COMPARISON.md, "Python scripts: correctness checks only").
 
 Steps: lowercase, split on non-alphanumeric characters, drop PostgreSQL's English
 stop words (tsearch_data/english.stop), stem with the Snowball English stemmer

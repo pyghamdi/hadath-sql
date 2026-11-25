@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate the results sections of ABLATION.md and COMPARISON.md from the
+"""Regenerate the results sections of ABLATION.md and STANDARD_SQL_COMPARISON.md from the
 results_*.csv files.
 
 The section between the RESULTS:BEGIN and RESULTS:END markers is replaced with one
@@ -90,7 +90,7 @@ def comparison_tables():
     return out
 
 
-FILES = {"ABLATION.md": ablation_tables, "COMPARISON.md": comparison_tables}
+FILES = {"ABLATION.md": ablation_tables, "STANDARD_SQL_COMPARISON.md": comparison_tables}
 
 
 def main():

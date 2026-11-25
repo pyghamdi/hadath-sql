@@ -1,4 +1,4 @@
-"""TF-IDF stage of the external Python pipeline (COMPARISON.md, "External pipeline").
+"""TF-IDF stage of the external Python pipeline (STANDARD_SQL_COMPARISON.md, "Python scripts: correctness checks only").
 
 Uses scikit-learn's TfidfVectorizer, the standard Python tool for TF-IDF, with
 its default weighting. Starts from a documents table in PostgreSQL and ends with

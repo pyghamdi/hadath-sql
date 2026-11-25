@@ -1,5 +1,5 @@
 """TF-IDF stage: HadathSQL (hsql_create_tf_idf_tbl) against the same weights computed
-in standard SQL only (tfidf_standard.sql). See COMPARISON.md, "TF-IDF stage in
+in standard SQL only (tfidf_standard.sql). See STANDARD_SQL_COMPARISON.md, "TF-IDF stage in
 standard SQL".
 
 For each dataset and size: generate sp_docs with gen_synthetic_data.sql (same

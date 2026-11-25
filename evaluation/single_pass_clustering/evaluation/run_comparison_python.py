@@ -1,6 +1,6 @@
 """Clustering stage: the HadathSQL driver (hsql_single_pass_clustering_tfidf) against
-the external Python pipeline (external_pipeline_clustering.py). See COMPARISON.md,
-"External pipeline", "Clustering stage".
+the external Python pipeline (external_pipeline_clustering.py). See STANDARD_SQL_COMPARISON.md,
+"Python scripts: correctness checks only".
 
 For each dataset and size: generate sp_docs with gen_synthetic_data.sql (same
 settings and seed as run_point.sh) and build the TF-IDF table sp_tfidf once with

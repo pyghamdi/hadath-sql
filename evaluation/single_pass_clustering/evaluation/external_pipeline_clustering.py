@@ -1,4 +1,4 @@
-"""Clustering stage of the external Python pipeline (COMPARISON.md, "External pipeline").
+"""Clustering stage of the external Python pipeline (STANDARD_SQL_COMPARISON.md, "Python scripts: correctness checks only").
 
 The baseline of an application without a driver UDF: it reads HadathSQL's TF-IDF
 weights table out of PostgreSQL, runs single-pass clustering in Python, and writes
