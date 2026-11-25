@@ -25,10 +25,15 @@ comparison and the correctness reference.
 - Datasets (`ABLATION.md`, *Datasets*) and thresholds as in the ablation.
 - Documents: Synthetic-Tweets 100, 200, 400, 800, 1,600, 3,200; Synthetic-News 25, 50,
   100, 200, 400.
-- CTE time: its input preparation (numbering of the documents and their term rows)
-  plus the query; the time limit applies to each of the two separately.
-- Same repetitions (median of up to 3 runs; one run when a run takes 60 s or more),
-  time limit (30 minutes per run), and dropout rule as the ablation.
+- CTE time: the wall-clock time of one `psql` session that runs its input preparation
+  (`prep_cte_standard.sql`: numbering of the documents in timestamp order with its
+  primary key, one row per (document, term) with its index, `ANALYZE`) and then the
+  CTE (`run_cte_standard.sql`), whose assignments are written into `cte_rows_out`. Not
+  included: building the weights table `sp_tfidf`, which is shared with the driver.
+- Time limit: one hour, enforced with `statement_timeout`, so it applies to each SQL
+  statement (in practice, the CTE query).
+- Same repetitions (median of up to 3 runs; one run when a run takes 60 s or more)
+  and dropout rule as the ablation; the time limit is longer than its 30 minutes.
 
 Results: `results_comparison_cte_synthetic_tweets.csv`,
 `results_comparison_cte_synthetic_news.csv`. A partial
