@@ -50,12 +50,12 @@ def no_index(tbls, drv):
 def mean(tbls, drv):
     # Running-mean centroids instead of summed ones: the cluster table stores the norm
     # of the mean instead of the squared norm of the sum, the centroid table holds means
-    # (so it is named <output_tbl>_centroid), and adding a document rewrites every entry
+    # (so it is named <output_tbl>_centroids), and adding a document rewrites every entry
     # of the centroid.
     tbls = sub(tbls, "            sum_sq_norm float NOT NULL DEFAULT 0.0\n",
                      "            norm float NOT NULL DEFAULT 0.0\n")
-    drv = sub(drv, "centroid_tbl text := output_tbl || '_summed_centroid';",
-                   "centroid_tbl text := output_tbl || '_centroid';")
+    drv = sub(drv, "centroid_tbl text := output_tbl || '_summed_centroids';",
+                   "centroid_tbl text := output_tbl || '_centroids';")
     drv = sub(drv, "c.prod / NULLIF(a_norm.norm * SQRT(r.sum_sq_norm), 0.0)", "c.prod / NULLIF(a_norm.norm * r.norm, 0.0)")
     old_add = cut(drv, "    -- Add the document with id $2 to cluster $1, in one statement:", "    );\n")
     drv = sub(drv, old_add, """    -- Add the document with id $2 to cluster $1, in one statement (mean centroids):
@@ -98,12 +98,12 @@ def mean(tbls, drv):
          SET doc_count = doc_count + 1,
              norm = (SELECT SQRT(COALESCE(SUM(new_weight * new_weight), 0.0)) FROM merged)
          WHERE cid = $1',
-        output_tbl,
+        clusters_tbl,
         centroid_tbl,
         tfidf_tbl,
         centroid_tbl,
         assignments_tbl,
-        output_tbl
+        clusters_tbl
     );
 """)
     return tbls, drv
@@ -163,5 +163,8 @@ for path, fn, change, desc in VARIANTS:
             f"-- hsql_single_pass_clustering_tfidf. Comments are the HadathSQL driver's and may\n"
             f"-- mention what this variant removes.\n\n")
     with open(os.path.join(HERE, path), "w") as f:
-        f.write(head + tbls + "\n\n\n" + drv + "\n")
+        # The tables function's first parameter was formerly named output_tbl, and
+        # CREATE OR REPLACE cannot rename a parameter, so an earlier version is dropped.
+        drop = f"DROP FUNCTION IF EXISTS {fn}_tbls(text, text, text, boolean);\n"
+        f.write(head + drop + tbls + "\n\n\n" + drv + "\n")
     print("wrote", path)

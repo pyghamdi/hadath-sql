@@ -21,7 +21,7 @@ sum gives the same similarities, and hence the same clusters, as the mean, but
 adding a document changes only the entries of the document's own terms, instead
 of every entry of the centroid. The summed centroids are the driver's working
 state and are left as they are at the end of the pass, in
-`<output_tbl>_summed_centroid`; nothing is lost by not dividing them: the mean
+`<output_tbl>_summed_centroids`; nothing is lost by not dividing them: the mean
 centroid of a cluster is its sum divided by doc_count, and ranking the terms of a
 cluster by their summed weight gives the same order as ranking them by their mean
 weight (e.g. to list the top terms of an event).
@@ -29,17 +29,19 @@ weight (e.g. to list the top terms of an event).
 This module avoids PostgreSQL composite types entirely; all vectors are stored
 as normal rows so they can be indexed and queried with plain SQL.
 
-Output tables (all created by `hsql_create_tbls_for_single_pass_clustering`):
-  <output_tbl>                          (cid SERIAL PK, doc_count INT,
+Output tables (all created by `hsql_create_tbls_for_single_pass_clustering`);
+`output_tbl` is the prefix of their names:
+  <output_tbl>_clusters                 (cid SERIAL PK, doc_count INT,
                                          sum_sq_norm FLOAT)
-  <output_tbl>_summed_centroid          (cid FK, term, weight = summed weight,
+  <output_tbl>_summed_centroids         (cid FK, term, weight = summed weight,
                                          PK(cid, term), index on (term, cid))
-  <output_tbl>_cluster_assignments      (doc_id PK, cid FK)
+  <output_tbl>_assignments              (doc_id PK, cid FK)
 
 Public functions:
-  hsql_create_tbls_for_single_pass_clustering(output_tbl, centroid_tbl,
+  hsql_create_tbls_for_single_pass_clustering(clusters_tbl, centroid_tbl,
                                               assignments_tbl, overwrite_tbl)
-      (centroid_tbl is <output_tbl>_summed_centroid when called by the driver)
+      (the driver passes <output_tbl>_clusters, <output_tbl>_summed_centroids,
+      and <output_tbl>_assignments)
   hsql_single_pass_clustering(input_tbl, doc_id_col, text_col, ts_col,
                               output_tbl, threshold, overwrite_output)
       Builds the TF-IDF table, then clusters (calls the function below).
@@ -60,12 +62,12 @@ hsql_create_tbls_for_single_pass_clustering
 --------------------------------------------------------------------------------
 Creates (or recreates) the three tables used by single-pass clustering:
 
-  <output_tbl>          Cluster registry.
+  <clusters_tbl>        Cluster registry.
                         Columns: cid SERIAL PRIMARY KEY, doc_count INTEGER,
                                  sum_sq_norm FLOAT (squared norm of the summed
                                  centroid, kept up to date during clustering).
   <centroid_tbl>        Summed cluster centroids in long form.
-                        Columns: cid -> output_tbl(cid) ON DELETE CASCADE,
+                        Columns: cid -> clusters_tbl(cid) ON DELETE CASCADE,
                                  term TEXT, weight FLOAT (sum of the term's
                                  weights over the documents of the cluster),
                                  PRIMARY KEY (cid, term).
@@ -76,10 +78,10 @@ Creates (or recreates) the three tables used by single-pass clustering:
                         created with fillfactor 80 to leave room for such updates.
   <assignments_tbl>     Document-to-cluster assignments.
                         Columns: doc_id INTEGER PRIMARY KEY,
-                                 cid -> output_tbl(cid) ON DELETE CASCADE.
+                                 cid -> clusters_tbl(cid) ON DELETE CASCADE.
 
 Parameters:
-  output_tbl       - Name of the cluster registry table to create.
+  clusters_tbl       - Name of the cluster registry table to create.
   centroid_tbl     - Name of the centroid table to create.
   assignments_tbl  - Name of the assignments table to create.
   overwrite_tbl    - If TRUE and ANY of the three target tables already exists,
@@ -89,28 +91,31 @@ Parameters:
 Returns: void
 
 Notes:
-  - Existence is checked for all three tables, not just `output_tbl`, so
+  - Existence is checked for all three tables, not just `clusters_tbl`, so
     orphan sibling tables left from a previous run cannot survive an
     `overwrite_tbl=TRUE` rebuild.
 ############################################################################## */
+-- Its first parameter was formerly named output_tbl, and CREATE OR REPLACE cannot
+-- rename a parameter, so an earlier version is dropped first.
+DROP FUNCTION IF EXISTS hsql_create_tbls_for_single_pass_clustering(text, text, text, boolean);
 CREATE OR REPLACE FUNCTION hsql_create_tbls_for_single_pass_clustering(
-    output_tbl text,
+    clusters_tbl text,
     centroid_tbl text,
     assignments_tbl text,
     overwrite_tbl boolean DEFAULT FALSE
 )
 RETURNS VOID AS $$
 DECLARE
-    any_exists boolean := hsql_table_exists_any_schema(output_tbl)
+    any_exists boolean := hsql_table_exists_any_schema(clusters_tbl)
                        OR hsql_table_exists_any_schema(centroid_tbl)
                        OR hsql_table_exists_any_schema(assignments_tbl);
 BEGIN
     IF any_exists AND NOT overwrite_tbl THEN
         RAISE EXCEPTION
             'One of %, %, % already exists. Set overwrite_tbl=TRUE to overwrite.',
-            output_tbl, centroid_tbl, assignments_tbl;
+            clusters_tbl, centroid_tbl, assignments_tbl;
     ELSIF any_exists AND overwrite_tbl THEN
-        EXECUTE format('DROP TABLE IF EXISTS %I, %I, %I CASCADE', output_tbl, centroid_tbl, assignments_tbl);
+        EXECUTE format('DROP TABLE IF EXISTS %I, %I, %I CASCADE', clusters_tbl, centroid_tbl, assignments_tbl);
     END IF;
 
     -- Cluster registry: one row per cluster, with a running document count and the
@@ -121,7 +126,7 @@ BEGIN
             doc_count integer NOT NULL DEFAULT 0,
             sum_sq_norm float NOT NULL DEFAULT 0.0
         )',
-        output_tbl
+        clusters_tbl
     );
 
     -- Centroid table: long-format (cid, term, weight); one row per term per cluster;
@@ -134,7 +139,7 @@ BEGIN
             PRIMARY KEY (cid, term)
         ) WITH (fillfactor = 80)',
         centroid_tbl,
-        output_tbl
+        clusters_tbl
     );
 
     -- Term index: finds the clusters that share a term with a document.
@@ -147,7 +152,7 @@ BEGIN
             cid integer NOT NULL REFERENCES %I(cid) ON DELETE CASCADE
         )',
         assignments_tbl,
-        output_tbl
+        clusters_tbl
     );
 END;
 $$ LANGUAGE plpgsql;
@@ -170,7 +175,7 @@ Parameters:
   ts_col            - Column in `input_tbl` used to ORDER BY when iterating.
   tfidf_tbl         - Existing TF-IDF table (doc_id, term, weight). If it has no
                       index on doc_id, one is created (and the table analyzed).
-  output_tbl        - Base name for the output tables (see below).
+  output_tbl        - Prefix of the names of the output tables (see below).
   threshold         - Minimum cosine similarity in [0, 1] required to attach a
                       document to an existing cluster instead of opening a new
                       one. Default 0.7.
@@ -178,9 +183,9 @@ Parameters:
                       already exist; otherwise raise. Default FALSE.
 
 Side effects (tables created / populated):
-  <output_tbl>                       Cluster registry (cid, doc_count, sum_sq_norm).
-  <output_tbl>_summed_centroid       Per-cluster summed term weights.
-  <output_tbl>_cluster_assignments   doc_id -> cid mapping.
+  <output_tbl>_clusters              Cluster registry (cid, doc_count, sum_sq_norm).
+  <output_tbl>_summed_centroids      Per-cluster summed term weights.
+  <output_tbl>_assignments           doc_id -> cid mapping.
 
 Cosine similarity:
                           sum_t  a_t * b_t
@@ -188,7 +193,7 @@ Cosine similarity:
                     sqrt(sum_t a_t^2) * sqrt(sum_t b_t^2)
   where a is the TF-IDF vector of the current document (a row set from
   `tfidf_tbl` filtered by doc_id) and b is the centroid vector of a candidate
-  cluster (a row set from `<output_tbl>_summed_centroid` filtered by cid). When either
+  cluster (a row set from `<output_tbl>_summed_centroids` filtered by cid). When either
   norm is 0 the similarity is treated as 0.
 
 Centroid update (centroids are stored as sums):
@@ -210,10 +215,10 @@ Example:
                                      'doc_clusters', 0.5, TRUE);
 
   -- Clusters and their sizes
-  SELECT cid, doc_count FROM doc_clusters ORDER BY doc_count DESC;
+  SELECT cid, doc_count FROM doc_clusters_clusters ORDER BY doc_count DESC;
 
   -- Cluster of each document
-  SELECT doc_id, cid FROM doc_clusters_cluster_assignments;
+  SELECT doc_id, cid FROM doc_clusters_assignments;
 
   A runnable example is in demo.sql in this directory.
 
@@ -223,7 +228,7 @@ Notes:
     `best_cluster_query`, which reads the document's vector through the index on
     `tfidf_tbl(doc_id)`, finds the clusters that share a term with it
     through the term index of the centroid table, and reads their norms from
-    `<output_tbl>`; and `add_document_query`, which adds the document to a
+    `<output_tbl>_clusters`; and `add_document_query`, which adds the document to a
     cluster. Neither scans a whole table, and both touch only the entries of the
     document's terms.
   - The statistics of the cluster and centroid tables are refreshed (ANALYZE)
@@ -257,8 +262,9 @@ DECLARE
                                     -- assignment) in one statement.
 
     -- Derived table names.
-    centroid_tbl text := output_tbl || '_summed_centroid';
-    assignments_tbl text := output_tbl || '_cluster_assignments';
+    clusters_tbl text := output_tbl || '_clusters';
+    centroid_tbl text := output_tbl || '_summed_centroids';
+    assignments_tbl text := output_tbl || '_assignments';
 
     -- Loop state.
     doc_id integer;                 -- Current document id from input_tbl.
@@ -296,8 +302,8 @@ BEGIN
         EXECUTE format('ANALYZE %I', tfidf_tbl);
     END IF;
 
-    RAISE NOTICE 'Creating output tables %, %, %...', output_tbl, centroid_tbl, assignments_tbl;
-    PERFORM hsql_create_tbls_for_single_pass_clustering(output_tbl, centroid_tbl, assignments_tbl, overwrite_output);
+    RAISE NOTICE 'Creating output tables %, %, %...', clusters_tbl, centroid_tbl, assignments_tbl;
+    PERFORM hsql_create_tbls_for_single_pass_clustering(clusters_tbl, centroid_tbl, assignments_tbl, overwrite_output);
 
     -- Drive the main loop: stream document ids in the requested chronological order;
     -- documents with the same timestamp are taken in doc_id order, so the order, and
@@ -312,7 +318,7 @@ BEGIN
     --   dot_val = a . b_c for the clusters c that share a term with the document,
     --             found through the term index of centroid_tbl; every other
     --             cluster has similarity 0.
-    --   norms   = ||b_c|| = sqrt(sum_sq_norm) read from output_tbl, where it is
+    --   norms   = ||b_c|| = sqrt(sum_sq_norm) read from clusters_tbl, where it is
     --             kept up to date, instead of being recomputed from centroid_tbl.
     --   sim     = cosine similarity using the standard dot/norm formula above.
     -- The query returns (cid, sim) of the single best cluster (LIMIT 1), with
@@ -353,14 +359,14 @@ BEGIN
         tfidf_tbl,
         centroid_tbl,
         centroid_tbl,
-        output_tbl
+        clusters_tbl
     );
 
     -- Create an empty cluster (doc_count 0, sum_sq_norm 0); the document that seeds
     -- it is then added with add_document_query, like any other document.
     new_cluster_query := format(
         'INSERT INTO %I DEFAULT VALUES RETURNING cid',
-        output_tbl
+        clusters_tbl
     );
 
     -- Add the document with id $2 to cluster $1, in one statement:
@@ -404,7 +410,7 @@ BEGIN
         centroid_tbl,
         centroid_tbl,
         assignments_tbl,
-        output_tbl
+        clusters_tbl
     );
 
     -- Prepare every per-document statement once. Inside the loop, each one is run
@@ -451,7 +457,7 @@ BEGIN
         -- only about log2(N) ANALYZE runs, and each one invalidates the cached plans,
         -- so the prepared statements are planned again with the current sizes.
         IF doc_count >= next_analyze THEN
-            EXECUTE format('ANALYZE %I, %I', output_tbl, centroid_tbl);
+            EXECUTE format('ANALYZE %I, %I', clusters_tbl, centroid_tbl);
             next_analyze := next_analyze * 2;
         END IF;
     END LOOP;
@@ -463,7 +469,7 @@ BEGIN
         EXECUTE format('DEALLOCATE %I', stmt_name);
     END LOOP;
 
-    EXECUTE format('SELECT COUNT(*) FROM %I', output_tbl) INTO final_cluster_count;
+    EXECUTE format('SELECT COUNT(*) FROM %I', clusters_tbl) INTO final_cluster_count;
     RAISE NOTICE 'Completed. Documents processed: %, clusters created: %', doc_count, final_cluster_count;
 END;
 $$ LANGUAGE plpgsql
@@ -488,7 +494,7 @@ Parameters:
   doc_id_col        - Column in `input_tbl` holding the document id (INTEGER).
   text_col          - Column in `input_tbl` holding document text for TF-IDF.
   ts_col            - Column in `input_tbl` used to ORDER BY when iterating.
-  output_tbl        - Base name for the output tables.
+  output_tbl        - Prefix of the names of the output tables.
   threshold         - Similarity threshold (see hsql_single_pass_clustering_tfidf).
                       Default 0.7.
   overwrite_output  - If TRUE, drop and recreate the output tables (including

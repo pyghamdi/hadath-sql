@@ -9,7 +9,7 @@ steps:
   export   SELECT doc_id FROM <docs> ORDER BY <ts>, doc_id, and
            SELECT doc_id, term, weight FROM <tfidf>                 (two queries)
   cluster  single-pass clustering in pure Python, in memory (below)
-  import   create <out>, <out>_summed_centroid, <out>_cluster_assignments with
+  import   create <out>_clusters, <out>_summed_centroids, <out>_assignments with
            hsql_create_tbls_for_single_pass_clustering (the driver's schema, keys,
            and indexes) and COPY the clusters, centroids, and assignments into them;
            one transaction, logged tables, as the driver's
@@ -153,17 +153,17 @@ def import_clusters(conn, out_tbl, assignments, centroids, sum_sq, sizes):
     with conn.cursor() as cur:
         cur.execute("SET client_min_messages = warning")
         cur.execute("SELECT hsql_create_tbls_for_single_pass_clustering(%s, %s, %s, TRUE)",
-                    (out_tbl, out_tbl + "_summed_centroid", out_tbl + "_cluster_assignments"))
-        copy(cur, out_tbl, "cid, doc_count, sum_sq_norm",
+                    (out_tbl + "_clusters", out_tbl + "_summed_centroids", out_tbl + "_assignments"))
+        copy(cur, out_tbl + "_clusters", "cid, doc_count, sum_sq_norm",
              (f"{i + 1}\t{n}\t{s!r}\n" for i, (n, s) in enumerate(zip(sizes, sum_sq))))
-        copy(cur, out_tbl + "_summed_centroid", "cid, term, weight",
+        copy(cur, out_tbl + "_summed_centroids", "cid, term, weight",
              (f"{i + 1}\t{term}\t{w!r}\n"
               for i, (c, n) in enumerate(zip(centroids, sizes)) for term, w in c.items()))
-        copy(cur, out_tbl + "_cluster_assignments", "doc_id, cid",
+        copy(cur, out_tbl + "_assignments", "doc_id, cid",
              (f"{d}\t{c}\n" for d, c in assignments.items()))
         if sizes:   # keep the SERIAL sequence of cid consistent with the rows copied
             cur.execute("SELECT setval(pg_get_serial_sequence(%s, 'cid'), %s)",
-                        (f'"{out_tbl}"', len(sizes)))
+                        (f'"{out_tbl}_clusters"', len(sizes)))
     conn.commit()
     return sent
 

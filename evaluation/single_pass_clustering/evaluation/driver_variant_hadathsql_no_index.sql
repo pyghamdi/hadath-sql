@@ -8,24 +8,25 @@
 -- hsql_single_pass_clustering_tfidf. Comments are the HadathSQL driver's and may
 -- mention what this variant removes.
 
+DROP FUNCTION IF EXISTS hsql_spc_hadathsql_noidx_tbls(text, text, text, boolean);
 CREATE OR REPLACE FUNCTION hsql_spc_hadathsql_noidx_tbls(
-    output_tbl text,
+    clusters_tbl text,
     centroid_tbl text,
     assignments_tbl text,
     overwrite_tbl boolean DEFAULT FALSE
 )
 RETURNS VOID AS $$
 DECLARE
-    any_exists boolean := hsql_table_exists_any_schema(output_tbl)
+    any_exists boolean := hsql_table_exists_any_schema(clusters_tbl)
                        OR hsql_table_exists_any_schema(centroid_tbl)
                        OR hsql_table_exists_any_schema(assignments_tbl);
 BEGIN
     IF any_exists AND NOT overwrite_tbl THEN
         RAISE EXCEPTION
             'One of %, %, % already exists. Set overwrite_tbl=TRUE to overwrite.',
-            output_tbl, centroid_tbl, assignments_tbl;
+            clusters_tbl, centroid_tbl, assignments_tbl;
     ELSIF any_exists AND overwrite_tbl THEN
-        EXECUTE format('DROP TABLE IF EXISTS %I, %I, %I CASCADE', output_tbl, centroid_tbl, assignments_tbl);
+        EXECUTE format('DROP TABLE IF EXISTS %I, %I, %I CASCADE', clusters_tbl, centroid_tbl, assignments_tbl);
     END IF;
 
     -- Cluster registry: one row per cluster, with a running document count and the
@@ -36,7 +37,7 @@ BEGIN
             doc_count integer NOT NULL DEFAULT 0,
             sum_sq_norm float NOT NULL DEFAULT 0.0
         )',
-        output_tbl
+        clusters_tbl
     );
 
     -- Centroid table: long-format (cid, term, weight); one row per term per cluster;
@@ -49,7 +50,7 @@ BEGIN
             PRIMARY KEY (cid, term)
         ) WITH (fillfactor = 80)',
         centroid_tbl,
-        output_tbl
+        clusters_tbl
     );
 
     -- Document-to-cluster assignments (each doc belongs to exactly one cluster).
@@ -59,7 +60,7 @@ BEGIN
             cid integer NOT NULL REFERENCES %I(cid) ON DELETE CASCADE
         )',
         assignments_tbl,
-        output_tbl
+        clusters_tbl
     );
 END;
 $$ LANGUAGE plpgsql;
@@ -85,8 +86,9 @@ DECLARE
                                     -- assignment) in one statement.
 
     -- Derived table names.
-    centroid_tbl text := output_tbl || '_summed_centroid';
-    assignments_tbl text := output_tbl || '_cluster_assignments';
+    clusters_tbl text := output_tbl || '_clusters';
+    centroid_tbl text := output_tbl || '_summed_centroids';
+    assignments_tbl text := output_tbl || '_assignments';
 
     -- Loop state.
     doc_id integer;                 -- Current document id from input_tbl.
@@ -111,8 +113,8 @@ BEGIN
             tfidf_tbl;
     END IF;
 
-    RAISE NOTICE 'Creating output tables %, %, %...', output_tbl, centroid_tbl, assignments_tbl;
-    PERFORM hsql_spc_hadathsql_noidx_tbls(output_tbl, centroid_tbl, assignments_tbl, overwrite_output);
+    RAISE NOTICE 'Creating output tables %, %, %...', clusters_tbl, centroid_tbl, assignments_tbl;
+    PERFORM hsql_spc_hadathsql_noidx_tbls(clusters_tbl, centroid_tbl, assignments_tbl, overwrite_output);
 
     -- Drive the main loop: stream document ids in the requested chronological order;
     -- documents with the same timestamp are taken in doc_id order, so the order, and
@@ -127,7 +129,7 @@ BEGIN
     --   dot_val = a . b_c for the clusters c that share a term with the document,
     --             found through the term index of centroid_tbl; every other
     --             cluster has similarity 0.
-    --   norms   = ||b_c|| = sqrt(sum_sq_norm) read from output_tbl, where it is
+    --   norms   = ||b_c|| = sqrt(sum_sq_norm) read from clusters_tbl, where it is
     --             kept up to date, instead of being recomputed from centroid_tbl.
     --   sim     = cosine similarity using the standard dot/norm formula above.
     -- The query returns (cid, sim) of the single best cluster (LIMIT 1), with
@@ -168,14 +170,14 @@ BEGIN
         tfidf_tbl,
         centroid_tbl,
         centroid_tbl,
-        output_tbl
+        clusters_tbl
     );
 
     -- Create an empty cluster (doc_count 0, sum_sq_norm 0); the document that seeds
     -- it is then added with add_document_query, like any other document.
     new_cluster_query := format(
         'INSERT INTO %I DEFAULT VALUES RETURNING cid',
-        output_tbl
+        clusters_tbl
     );
 
     -- Add the document with id $2 to cluster $1, in one statement:
@@ -219,7 +221,7 @@ BEGIN
         centroid_tbl,
         centroid_tbl,
         assignments_tbl,
-        output_tbl
+        clusters_tbl
     );
 
     -- Prepare every per-document statement once. Inside the loop, each one is run
@@ -266,7 +268,7 @@ BEGIN
         -- only about log2(N) ANALYZE runs, and each one invalidates the cached plans,
         -- so the prepared statements are planned again with the current sizes.
         IF doc_count >= next_analyze THEN
-            EXECUTE format('ANALYZE %I, %I', output_tbl, centroid_tbl);
+            EXECUTE format('ANALYZE %I, %I', clusters_tbl, centroid_tbl);
             next_analyze := next_analyze * 2;
         END IF;
     END LOOP;
@@ -278,7 +280,7 @@ BEGIN
         EXECUTE format('DEALLOCATE %I', stmt_name);
     END LOOP;
 
-    EXECUTE format('SELECT COUNT(*) FROM %I', output_tbl) INTO final_cluster_count;
+    EXECUTE format('SELECT COUNT(*) FROM %I', clusters_tbl) INTO final_cluster_count;
     RAISE NOTICE 'Completed. Documents processed: %, clusters created: %', doc_count, final_cluster_count;
 END;
 $$ LANGUAGE plpgsql

@@ -123,17 +123,21 @@ has cte-standard && cte_standard=$(measure -v th="$TH" -f prep_cte_standard.sql 
 num='^[0-9.]+$'
 clusters=NA; mism=0; ref=""
 if [[ "$driver" =~ $num ]]; then ref=drv; elif [[ "$noprep" =~ $num ]]; then ref=dnoprep; elif [[ "$mean" =~ $num ]]; then ref=dmean; elif [[ "$noidx" =~ $num ]]; then ref=dnoidx; elif [[ "$noopt" =~ $num ]]; then ref=dnoopt; elif [[ "$d1" =~ $num ]]; then ref=d1; elif [[ "$sum" =~ $num ]]; then ref=dsum; elif [[ "$sumidx" =~ $num ]]; then ref=dsumidx; fi
+# Assignments table of a driver's output prefix: the HadathSQL driver and its generated
+# ablation variants write <prefix>_assignments; the earlier drivers of the preliminary
+# runs write <prefix>_cluster_assignments.
+asg() { case $1 in drv|dnoidx|dmean|dnoprep|dnoopt) echo "${1}_assignments" ;; *) echo "${1}_cluster_assignments" ;; esac; }
 if [ -n "$ref" ]; then
-  clusters=$(psql -At -c "SELECT COUNT(DISTINCT cid) FROM ${ref}_cluster_assignments")
-  chk() { psql -At -c "SELECT COUNT(*) FROM ${ref}_cluster_assignments r FULL JOIN $1 x ON x.$2 = r.doc_id WHERE x.cid IS DISTINCT FROM r.cid"; }
+  clusters=$(psql -At -c "SELECT COUNT(DISTINCT cid) FROM $(asg $ref)")
+  chk() { psql -At -c "SELECT COUNT(*) FROM $(asg $ref) r FULL JOIN $1 x ON x.$2 = r.doc_id WHERE x.cid IS DISTINCT FROM r.cid"; }
   [[ "$ref" != d1 && "$d1" =~ $num ]] && mism=$((mism + $(chk d1_cluster_assignments doc_id)))
   [[ "$ref" != dsum && "$sum" =~ $num ]] && mism=$((mism + $(chk dsum_cluster_assignments doc_id)))
   [[ "$ref" != dsumidx && "$sumidx" =~ $num ]] && mism=$((mism + $(chk dsumidx_cluster_assignments doc_id)))
   [[ "$sumidxp" =~ $num ]] && mism=$((mism + $(chk dsumidxp_cluster_assignments doc_id)))
-  [[ "$ref" != dnoidx && "$noidx" =~ $num ]] && mism=$((mism + $(chk dnoidx_cluster_assignments doc_id)))
-  [[ "$ref" != dmean && "$mean" =~ $num ]] && mism=$((mism + $(chk dmean_cluster_assignments doc_id)))
-  [[ "$ref" != dnoprep && "$noprep" =~ $num ]] && mism=$((mism + $(chk dnoprep_cluster_assignments doc_id)))
-  [[ "$ref" != dnoopt && "$noopt" =~ $num ]] && mism=$((mism + $(chk dnoopt_cluster_assignments doc_id)))
+  [[ "$ref" != dnoidx && "$noidx" =~ $num ]] && mism=$((mism + $(chk $(asg dnoidx) doc_id)))
+  [[ "$ref" != dmean && "$mean" =~ $num ]] && mism=$((mism + $(chk $(asg dmean) doc_id)))
+  [[ "$ref" != dnoprep && "$noprep" =~ $num ]] && mism=$((mism + $(chk $(asg dnoprep) doc_id)))
+  [[ "$ref" != dnoopt && "$noopt" =~ $num ]] && mism=$((mism + $(chk $(asg dnoopt) doc_id)))
   [[ "$d2" =~ $num ]] && mism=$((mism + $(chk d2_cluster_assignments doc_id)))
   [[ "$cte_array" =~ $num ]] && mism=$((mism + $(chk cte_array_out did)))
   [[ "$cte_standard" =~ $num ]] && mism=$((mism + $(chk cte_rows_out did)))

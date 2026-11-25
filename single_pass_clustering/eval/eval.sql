@@ -212,8 +212,8 @@ BEGIN
                     p_max_rows, p_step_rows;
             END IF;
 
-            v_centroid_tbl := v_output_tbl || '_summed_centroid';
-            v_assignments_tbl := v_output_tbl || '_cluster_assignments';
+            v_centroid_tbl := v_output_tbl || '_summed_centroids';
+            v_assignments_tbl := v_output_tbl || '_assignments';
             v_tfidf_tbl := v_output_tbl || '_tfidf';
 
             FOR v_row_limit IN
@@ -246,7 +246,7 @@ BEGIN
                 v_elapsed_ms :=
                     EXTRACT(EPOCH FROM (clock_timestamp() - v_started_at)) * 1000.0;
 
-                EXECUTE format('SELECT COUNT(*)::bigint FROM %I', v_output_tbl)
+                EXECUTE format('SELECT COUNT(*)::bigint FROM %I', v_output_tbl || '_clusters')
                 INTO v_cluster_count;
                 EXECUTE format('SELECT COUNT(*)::bigint FROM %I', v_assignments_tbl)
                 INTO v_assignment_count;
@@ -255,7 +255,7 @@ BEGIN
 
                 EXECUTE format(
                     'DROP TABLE IF EXISTS %I, %I, %I, %I CASCADE',
-                    v_output_tbl,
+                    v_output_tbl || '_clusters',
                     v_centroid_tbl,
                     v_assignments_tbl,
                     v_tfidf_tbl

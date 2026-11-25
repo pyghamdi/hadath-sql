@@ -133,10 +133,10 @@ def measure(run, reps, rep_max, key=None):
 
 def check():
     with psycopg2.connect("") as conn, conn.cursor() as cur:
-        cur.execute("SELECT COUNT(DISTINCT cid) FROM drv_cluster_assignments")
+        cur.execute("SELECT COUNT(DISTINCT cid) FROM drv_assignments")
         clusters = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM drv_cluster_assignments r "
-                    "FULL JOIN dpy_cluster_assignments x USING (doc_id) WHERE x.cid IS DISTINCT FROM r.cid")
+        cur.execute("SELECT COUNT(*) FROM drv_assignments r "
+                    "FULL JOIN dpy_assignments x USING (doc_id) WHERE x.cid IS DISTINCT FROM r.cid")
         return clusters, cur.fetchone()[0]
 
 
