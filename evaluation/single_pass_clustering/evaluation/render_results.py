@@ -10,7 +10,6 @@ import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BEGIN, END = "<!-- RESULTS:BEGIN -->", "<!-- RESULTS:END -->"
-LIGHT = [("d1_s", "Basic"), ("d2_s", "Mean + indexed"), ("driver_s", "HadathSQL"), ("cte-array_s", "Array CTE (non-standard)"), ("cte-standard_s", "Standard SQL CTE")]
 DRIVERS = [("d1_s", "Basic"), ("sum_s", "Summed"), ("sumidx_s", "Summed + indexed"), ("sumidxp_s", "Summed + indexed + prepared"), ("d2_s", "Mean + indexed"), ("driver_s", "HadathSQL")]
 
 
@@ -77,8 +76,6 @@ def ablation_tables():
     out += section("results_basic_summed_", DRIVERS[:2], "Preliminary: basic vs summed driver", NOTE3)
     out += section("results_drivers_", DRIVERS, "Preliminary: driver experiment (all drivers)",
                    NOTE3 + " Drivers after the changes of 2026-10-18.")
-    out += section("results_", LIGHT, "Preliminary: light run (before the changes of 2026-10-18; D3 column omitted)",
-                   "Single run per point; measured before the changes of 2026-10-18.")
     return out
 
 

@@ -266,7 +266,10 @@ indexed + prepared, Mean + indexed; `driver_variant_basic.sql`, `driver_variant_
 `driver_variant_mean_indexed.sql`) and their configuration `small_evaluation.conf` were
 removed from the repository on 2026-11-25, since neither the ablation nor the comparison
 uses them; they are in its history (last in commit 96b7946). Their results files and the
-records below are kept.
+records below are kept. The Array CTE (non-standard), its helpers, and the results of
+the light run (`results_tweets.csv`, `results_news.csv`) were removed on the same date,
+since the evaluation compares HadathSQL only with standard SQL; its row below is kept
+as a record.
 
 | ID | Implementation | File | Per-document work |
 |---|---|---|---|
@@ -984,114 +987,6 @@ Median of up to 3 runs per point (single run when a run takes 60 s or more).
 | 600 | 600 | 3.85 | 27.86 | 29.00 | 0 |
 | 800 | 800 | 5.04 | 45.59 | 49.66 | 0 |
 | 1000 | 1000 | 9.65 | 74.00 | 70.11 | 0 |
-
-### Preliminary: light run (before the changes of 2026-10-18; D3 column omitted)
-
-Single run per point; measured before the changes of 2026-10-18.
-
-#### Tweets (synthetic)
-
-**Threshold 0**
-
-| docs | clusters | TF-IDF | Basic | Mean + indexed | HadathSQL | Array CTE (non-standard) | Standard SQL CTE | mismatches |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 200 | 1 | 0.23 | 10.30 | 11.91 | 0.33 | 0.55 | 4.09 | 0 |
-| 400 | 1 | 0.25 | 58.93 | 65.03 | 0.76 | 1.02 | 6.15 | 0 |
-| 600 | 1 | 0.28 | 165.16 | 183.22 | 0.81 | 2.84 | 11.83 | 0 |
-| 800 | 1 | 0.35 | > limit | > limit | 0.99 | 2.58 | 18.07 | 0 |
-| 1000 | 1 | 0.38 | – | – | 0.86 | 3.58 | 25.49 | 0 |
-
-**Threshold 0.2**
-
-| docs | clusters | TF-IDF | Basic | Mean + indexed | HadathSQL | Array CTE (non-standard) | Standard SQL CTE | mismatches |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 200 | 61 | 0.20 | 0.48 | 0.46 | 0.29 | 0.49 | 4.41 | 0 |
-| 400 | 66 | 0.24 | 1.20 | 0.87 | 0.40 | 1.11 | 7.25 | 0 |
-| 600 | 67 | 0.28 | 1.90 | 1.35 | 0.49 | 1.78 | 14.89 | 0 |
-| 800 | 67 | 0.31 | 3.04 | 1.92 | 0.61 | 2.57 | 24.24 | 0 |
-| 1000 | 68 | 0.36 | 4.51 | 2.58 | 0.70 | 3.38 | 36.01 | 0 |
-
-**Threshold 0.5**
-
-| docs | clusters | TF-IDF | Basic | Mean + indexed | HadathSQL | Array CTE (non-standard) | Standard SQL CTE | mismatches |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 200 | 191 | 0.19 | 0.39 | 0.37 | 0.29 | 0.79 | 5.62 | 0 |
-| 400 | 365 | 0.25 | 0.85 | 0.59 | 0.40 | 2.62 | 10.85 | 0 |
-| 600 | 521 | 0.28 | 1.54 | 0.89 | 0.55 | 5.60 | 23.97 | 0 |
-| 800 | 677 | 0.32 | 2.35 | 1.02 | 0.64 | 9.66 | 41.80 | 0 |
-| 1000 | 818 | 0.41 | 3.41 | 1.27 | 0.78 | 14.58 | 65.19 | 0 |
-
-**Threshold 0.7**
-
-| docs | clusters | TF-IDF | Basic | Mean + indexed | HadathSQL | Array CTE (non-standard) | Standard SQL CTE | mismatches |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 200 | 200 | 0.21 | 0.39 | 0.37 | 0.30 | 0.82 | 5.64 | 0 |
-| 400 | 400 | 0.24 | 0.83 | 0.62 | 0.40 | 2.76 | 10.98 | 0 |
-| 600 | 600 | 0.28 | 1.56 | 0.78 | 0.54 | 6.53 | 24.67 | 0 |
-| 800 | 800 | 0.35 | 2.40 | 1.01 | 0.69 | 10.31 | 44.67 | 0 |
-| 1000 | 1000 | 0.37 | 3.70 | 1.24 | 0.83 | 17.21 | 75.18 | 0 |
-
-**Threshold 1**
-
-| docs | clusters | TF-IDF | Basic | Mean + indexed | HadathSQL | Array CTE (non-standard) | Standard SQL CTE | mismatches |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 200 | 200 | 0.22 | 0.40 | 0.37 | 0.42 | 0.85 | 5.82 | 0 |
-| 400 | 400 | 0.24 | 1.06 | 0.58 | 0.40 | 3.22 | 11.21 | 0 |
-| 600 | 600 | 0.28 | 1.51 | 0.75 | 0.54 | 6.18 | 24.51 | 0 |
-| 800 | 800 | 0.31 | 2.31 | 0.94 | 0.62 | 10.76 | 44.35 | 0 |
-| 1000 | 1000 | 0.43 | 3.39 | 1.19 | 0.81 | 16.38 | 68.62 | 0 |
-
-#### News (synthetic)
-
-**Threshold 0**
-
-| docs | clusters | TF-IDF | Basic | Mean + indexed | HadathSQL | Array CTE (non-standard) | Standard SQL CTE | mismatches |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 200 | 1 | 1.43 | 299.32 | > limit | 3.71 | 7.68 | 299.86 | 0 |
-| 400 | 1 | 2.90 | > limit | – | 9.57 | 18.68 | > limit | 0 |
-| 600 | 1 | 4.14 | – | – | 15.80 | 30.39 | – | 0 |
-| 800 | 1 | 5.03 | – | – | 23.51 | 40.64 | – | 0 |
-| 1000 | 1 | 6.28 | – | – | 38.23 | 51.48 | – | 0 |
-
-**Threshold 0.2**
-
-| docs | clusters | TF-IDF | Basic | Mean + indexed | HadathSQL | Array CTE (non-standard) | Standard SQL CTE | mismatches |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 200 | 49 | 1.75 | 5.58 | 3.90 | 2.63 | 4.31 | > limit | 0 |
-| 400 | 50 | 3.03 | 21.74 | 13.88 | 6.19 | 16.79 | – | 0 |
-| 600 | 50 | 4.33 | > limit | 1114.83 | 8.33 | 31.34 | – | 0 |
-| 800 | 50 | 5.36 | – | 56.82 | 10.64 | 51.45 | – | 0 |
-| 1000 | 50 | 6.68 | – | 106.85 | 23.07 | 75.89 | – | 0 |
-
-**Threshold 0.5**
-
-| docs | clusters | TF-IDF | Basic | Mean + indexed | HadathSQL | Array CTE (non-standard) | Standard SQL CTE | mismatches |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 200 | 200 | 1.47 | 4.36 | 1.89 | 3.17 | 6.84 | > limit | 0 |
-| 400 | 400 | 2.94 | 14.23 | 2.77 | 7.02 | 26.46 | – | 0 |
-| 600 | 600 | 3.83 | 29.71 | 4.24 | 8.13 | 59.49 | – | 0 |
-| 800 | 800 | 5.25 | 46.96 | 6.22 | 11.10 | 121.45 | – | 0 |
-| 1000 | 1000 | 6.46 | 88.44 | 25.44 | 31.11 | 255.64 | – | 0 |
-
-**Threshold 0.7**
-
-| docs | clusters | TF-IDF | Basic | Mean + indexed | HadathSQL | Array CTE (non-standard) | Standard SQL CTE | mismatches |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 200 | 200 | 1.69 | 4.06 | 1.83 | 3.17 | 7.12 | > limit | 0 |
-| 400 | 400 | 3.01 | 15.98 | 3.66 | 7.32 | 28.92 | – | 0 |
-| 600 | 600 | 4.12 | 39.09 | 4.32 | 9.74 | 64.74 | – | 0 |
-| 800 | 800 | 5.28 | 52.05 | 6.04 | 11.34 | 119.79 | – | 0 |
-| 1000 | 1000 | 6.34 | 67.82 | 20.12 | 26.53 | 201.32 | – | 0 |
-
-**Threshold 1**
-
-| docs | clusters | TF-IDF | Basic | Mean + indexed | HadathSQL | Array CTE (non-standard) | Standard SQL CTE | mismatches |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 200 | 200 | 1.43 | 4.92 | 1.73 | 2.90 | 7.92 | > limit | 0 |
-| 400 | 400 | 3.42 | 15.57 | 3.20 | 8.29 | 31.12 | – | 0 |
-| 600 | 600 | 4.33 | 34.71 | 4.96 | 9.29 | 65.17 | – | 0 |
-| 800 | 800 | 5.68 | 48.24 | 6.18 | 11.39 | 117.59 | – | 0 |
-| 1000 | 1000 | 7.03 | 69.75 | 21.59 | 31.45 | 188.04 | – | 0 |
 
 <!-- RESULTS:END -->
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Prepares an empty PostgreSQL database for the evaluation (e.g. on the remote
-# server): installs HadathSQL, the Standard SQL CTE's helpers, and every driver
+# server): installs HadathSQL and every driver
 # variant (regenerating the ablation variants from sp_clustering.sql first), then
 # records the machine and server configuration in machine.txt.
 #
@@ -20,9 +20,9 @@ REPO=$(cd ../../.. && pwd)
 
 python3 make_ablation_variants.py
 (cd "$REPO" && psql -f install.sql >/dev/null)
-files=(-f setup_cte.sql); for f in driver_variant_*.sql; do files+=(-f "$f"); done
+files=(); for f in driver_variant_*.sql; do files+=(-f "$f"); done
 psql -c "SET client_min_messages = warning" "${files[@]}" >/dev/null
-echo "installed: HadathSQL, CTE helpers, $(ls driver_variant_*.sql | wc -l | tr -d ' ') driver variants"
+echo "installed: HadathSQL, $(ls driver_variant_*.sql | wc -l | tr -d ' ') driver variants"
 
 # Machine and server configuration, for the setup section of the paper.
 {

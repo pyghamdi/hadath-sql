@@ -87,8 +87,9 @@ not for performance comparison: their times are not part of the evaluation.
 4. Copy back `results_comparison_cte_*.csv` and the log, and run
    `python3 render_results.py` to update the results tables here.
 
-The preliminary light run on the laptop (`ABLATION.md`) also timed the Standard SQL
-CTE and the Array CTE (non-standard) at 200 to 1,000 documents.
+The preliminary light run on the laptop also timed the Standard SQL CTE at 200 to
+1,000 documents; its results were removed from the repository with the Array CTE
+(`ABLATION.md`).
 
 ## Results
 

@@ -6,16 +6,15 @@
 # Usage: run_point.sh <setting> <n> <threshold> <methods> [timeout_s]
 #   setting: synthetic_tweets | synthetic_news (datasets of gen_synthetic_data.sql)
 #   methods: comma-separated subset of
-#            driver,noidx,mean,noprep,noopt,cte-standard,cte-array
+#            driver,noidx,mean,noprep,noopt,cte-standard
 #     driver = HadathSQL driver, hsql_single_pass_clustering_tfidf (sp_clustering.sql)
 #     noidx  = HadathSQL driver without indexes (reads the unindexed copy)
 #     mean   = HadathSQL driver without summed centroids (running means)
 #     noprep = HadathSQL driver without prepared statements
 #     noopt  = HadathSQL driver without all three (reads the unindexed copy)
-#     cte-array    = Array CTE (non-standard; input preparation included in its time)
 #     cte-standard = Standard SQL CTE (input preparation included in its time)
-# Prints one CSV line (the columns d1_s, sum_s, sumidx_s, sumidxp_s, and d2_s belong to
-# the drivers of the preliminary runs, which were removed from the repository; they are
+# Prints one CSV line (the columns d1_s, sum_s, sumidx_s, sumidxp_s, d2_s, and cte-array_s
+# belong to the drivers and the Array CTE of the preliminary runs, which were removed from the repository; they are
 # kept, always NA, so that the results files keep one format):
 #   setting,n,threshold,clusters,tfidf_s,d1_s,sum_s,sumidx_s,sumidxp_s,d2_s,driver_s,noidx_s,mean_s,noprep_s,noopt_s,cte-array_s,cte-standard_s,mismatches,load_start,load_end
 # Each method is run REPS times (default 3) while its runs take less than REP_MAX
@@ -106,7 +105,6 @@ has noidx && noidx=$(measure -c "SELECT hsql_spc_hadathsql_noidx('sp_docs','doc_
 has mean && mean=$(measure -c "SELECT hsql_spc_hadathsql_mean('sp_docs','doc_id','ts','sp_tfidf','dmean',$TH,TRUE)")
 has noprep && noprep=$(measure -c "SELECT hsql_spc_hadathsql_noprep('sp_docs','doc_id','ts','sp_tfidf','dnoprep',$TH,TRUE)")
 has noopt && noopt=$(measure -c "SELECT hsql_spc_hadathsql_noopt('sp_docs','doc_id','ts','sp_tfidf_noidx','dnoopt',$TH,TRUE)")
-has cte-array && cte_array=$(measure -v th="$TH" -f prep_cte_array.sql -f run_cte_array.sql)
 has cte-standard && cte_standard=$(measure -v th="$TH" -f prep_cte_standard.sql -f run_cte_standard.sql)
 
 # Equivalence with a reference for every method that completed: the HadathSQL driver if it ran,
@@ -124,7 +122,6 @@ if [ -n "$ref" ]; then
   [[ "$ref" != dmean && "$mean" =~ $num ]] && mism=$((mism + $(chk $(asg dmean) doc_id)))
   [[ "$ref" != dnoprep && "$noprep" =~ $num ]] && mism=$((mism + $(chk $(asg dnoprep) doc_id)))
   [[ "$ref" != dnoopt && "$noopt" =~ $num ]] && mism=$((mism + $(chk $(asg dnoopt) doc_id)))
-  [[ "$cte_array" =~ $num ]] && mism=$((mism + $(chk cte_array_out did)))
   [[ "$cte_standard" =~ $num ]] && mism=$((mism + $(chk cte_rows_out did)))
 else
   mism=NA
