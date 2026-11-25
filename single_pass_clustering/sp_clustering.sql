@@ -12,28 +12,34 @@ Algorithm (one pass over documents, ordered by `ts_col`):
        a. Compute cosine similarity between d and every existing centroid.
        b. Let (c*, sim*) be the best (centroid, similarity) pair.
        c. If sim* >= threshold: assign d to c* and update c*'s centroid, the
-          mean of the TF-IDF vectors of all documents in c*.
+          sum (equivalently, the mean) of the TF-IDF vectors of the documents in c*.
        d. Otherwise: open a new cluster seeded with d's TF-IDF vector.
 
-During the pass, each centroid is stored as the SUM of its documents' vectors
-rather than their mean. The cosine similarity does not depend on the length of
-a vector, so the sum gives the same similarities as the mean, but adding a
-document changes only the entries of the document's own terms, instead of
-every entry of the centroid. At the end, every sum is divided by the size of
-its cluster, so the output holds the mean centroids.
+Each centroid is stored as the SUM of its documents' vectors rather than their
+mean. The cosine similarity does not depend on the length of a vector, so the
+sum gives the same similarities, and hence the same clusters, as the mean, but
+adding a document changes only the entries of the document's own terms, instead
+of every entry of the centroid. The summed centroids are the driver's working
+state and are left as they are at the end of the pass, in
+`<output_tbl>_summed_centroid`; nothing is lost by not dividing them: the mean
+centroid of a cluster is its sum divided by doc_count, and ranking the terms of a
+cluster by their summed weight gives the same order as ranking them by their mean
+weight (e.g. to list the top terms of an event).
 
 This module avoids PostgreSQL composite types entirely; all vectors are stored
 as normal rows so they can be indexed and queried with plain SQL.
 
 Output tables (all created by `hsql_create_tbls_for_single_pass_clustering`):
-  <output_tbl>                          (cid SERIAL PK, doc_count INT, norm FLOAT)
-  <output_tbl>_centroid                 (cid FK, term, weight, PK(cid, term),
-                                         index on (term, cid))
+  <output_tbl>                          (cid SERIAL PK, doc_count INT,
+                                         sum_sq_norm FLOAT)
+  <output_tbl>_summed_centroid          (cid FK, term, weight = summed weight,
+                                         PK(cid, term), index on (term, cid))
   <output_tbl>_cluster_assignments      (doc_id PK, cid FK)
 
 Public functions:
   hsql_create_tbls_for_single_pass_clustering(output_tbl, centroid_tbl,
                                               assignments_tbl, overwrite_tbl)
+      (centroid_tbl is <output_tbl>_summed_centroid when called by the driver)
   hsql_single_pass_clustering(input_tbl, doc_id_col, text_col, ts_col,
                               output_tbl, threshold, overwrite_output)
       Builds the TF-IDF table, then clusters (calls the function below).
@@ -56,13 +62,12 @@ Creates (or recreates) the three tables used by single-pass clustering:
 
   <output_tbl>          Cluster registry.
                         Columns: cid SERIAL PRIMARY KEY, doc_count INTEGER,
-                                 norm FLOAT (Euclidean norm of the centroid),
                                  sum_sq_norm FLOAT (squared norm of the summed
-                                 centroid; used during clustering and dropped
-                                 by hsql_single_pass_clustering at the end).
-  <centroid_tbl>        Cluster centroids in long form.
+                                 centroid, kept up to date during clustering).
+  <centroid_tbl>        Summed cluster centroids in long form.
                         Columns: cid -> output_tbl(cid) ON DELETE CASCADE,
-                                 term TEXT, weight FLOAT,
+                                 term TEXT, weight FLOAT (sum of the term's
+                                 weights over the documents of the cluster),
                                  PRIMARY KEY (cid, term).
                         Index on (term, cid), so that the clusters that share a
                         term with a document are found without a scan. weight is
@@ -108,20 +113,19 @@ BEGIN
         EXECUTE format('DROP TABLE IF EXISTS %I, %I, %I CASCADE', output_tbl, centroid_tbl, assignments_tbl);
     END IF;
 
-    -- Cluster registry: one row per cluster, with a running document count, the
-    -- squared norm of the summed centroid (kept up to date during clustering), and
-    -- the norm of the mean centroid (set at the end).
+    -- Cluster registry: one row per cluster, with a running document count and the
+    -- squared norm of the summed centroid (kept up to date during clustering).
     EXECUTE format(
         'CREATE TABLE IF NOT EXISTS %I (
             cid SERIAL PRIMARY KEY,
             doc_count integer NOT NULL DEFAULT 0,
-            norm float NOT NULL DEFAULT 0.0,
             sum_sq_norm float NOT NULL DEFAULT 0.0
         )',
         output_tbl
     );
 
-    -- Centroid table: long-format (cid, term, weight); one row per term per cluster.
+    -- Centroid table: long-format (cid, term, weight); one row per term per cluster;
+    -- weight is the sum of the term's weights over the documents of the cluster.
     EXECUTE format(
         'CREATE TABLE IF NOT EXISTS %I (
             cid integer NOT NULL REFERENCES %I(cid) ON DELETE CASCADE,
@@ -174,8 +178,8 @@ Parameters:
                       already exist; otherwise raise. Default FALSE.
 
 Side effects (tables created / populated):
-  <output_tbl>                       Cluster registry (cid, doc_count, norm).
-  <output_tbl>_centroid              Per-cluster term weights.
+  <output_tbl>                       Cluster registry (cid, doc_count, sum_sq_norm).
+  <output_tbl>_summed_centroid       Per-cluster summed term weights.
   <output_tbl>_cluster_assignments   doc_id -> cid mapping.
 
 Cosine similarity:
@@ -184,16 +188,17 @@ Cosine similarity:
                     sqrt(sum_t a_t^2) * sqrt(sum_t b_t^2)
   where a is the TF-IDF vector of the current document (a row set from
   `tfidf_tbl` filtered by doc_id) and b is the centroid vector of a candidate
-  cluster (a row set from `<output_tbl>_centroid` filtered by cid). When either
+  cluster (a row set from `<output_tbl>_summed_centroid` filtered by cid). When either
   norm is 0 the similarity is treated as 0.
 
-Centroid update (centroids are stored as sums during the pass):
+Centroid update (centroids are stored as sums):
         sum(term) += doc_weight(term)          for each term of the document
         ||sum||^2 += sum_t doc_w(t) * (2 * old_sum(t) + doc_w(t))
   Only the document's terms are touched, and the squared norm is updated from
   them alone. Since sim(a, sum) = sim(a, sum / n), clustering with sums gives
   the same clusters as clustering with means (up to floating-point rounding).
-  At the end, weight = sum / doc_count and norm = sqrt(||sum||^2) / doc_count.
+  The sums are left as they are at the end: the mean centroid is
+  weight / doc_count, and its norm is sqrt(sum_sq_norm) / doc_count.
   Terms with a weight of 0 never enter a centroid. (A TF-IDF weight is 0 only
   for a term that occurs in every document.)
 
@@ -252,7 +257,7 @@ DECLARE
                                     -- assignment) in one statement.
 
     -- Derived table names.
-    centroid_tbl text := output_tbl || '_centroid';
+    centroid_tbl text := output_tbl || '_summed_centroid';
     assignments_tbl text := output_tbl || '_cluster_assignments';
 
     -- Loop state.
@@ -450,17 +455,6 @@ BEGIN
             next_analyze := next_analyze * 2;
         END IF;
     END LOOP;
-
-    -- Turn the summed centroids into mean centroids, and their norms accordingly.
-    EXECUTE format(
-        'UPDATE %I c SET weight = c.weight / r.doc_count FROM %I r
-         WHERE r.cid = c.cid AND r.doc_count > 1',     -- a sum over one document is its mean
-        centroid_tbl, output_tbl
-    );
-    EXECUTE format(
-        'UPDATE %I SET norm = SQRT(sum_sq_norm) / doc_count', output_tbl
-    );
-    EXECUTE format('ALTER TABLE %I DROP COLUMN sum_sq_norm', output_tbl);
 
     -- Release the prepared statements.
     FOR stmt_name IN

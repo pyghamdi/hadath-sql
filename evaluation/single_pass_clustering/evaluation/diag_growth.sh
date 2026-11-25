@@ -25,7 +25,7 @@ q -c "CREATE EXTENSION IF NOT EXISTS pgstattuple" >/dev/null
 JOIN="SELECT count(*) FROM (SELECT l.doc_id, b.cid, SUM(a.weight * b.weight)
        FROM (SELECT doc_id FROM sp_docs ORDER BY ts DESC LIMIT 200) l
        JOIN sp_tfidf a ON a.doc_id = l.doc_id
-       JOIN drv_centroid b ON b.term = a.term
+       JOIN drv_summed_centroid b ON b.term = a.term
        GROUP BY l.doc_id, b.cid) s"
 
 for spec in "$@"; do
@@ -50,14 +50,14 @@ SELECT count(*) AS clusters FROM drv \gset
 SELECT round(avg(r)::numeric, 1) AS jr, round(avg(c)::numeric, 1) AS cc FROM (
   SELECT count(*) AS r, count(DISTINCT b.cid) AS c
   FROM (SELECT doc_id FROM sp_docs ORDER BY ts DESC LIMIT 200) l
-  JOIN sp_tfidf a ON a.doc_id = l.doc_id JOIN drv_centroid b ON b.term = a.term
+  JOIN sp_tfidf a ON a.doc_id = l.doc_id JOIN drv_summed_centroid b ON b.term = a.term
   GROUP BY l.doc_id) s \gset
 SELECT clock_timestamp() AS t1 \gset
 $JOIN \g /dev/null
 SELECT round(extract(epoch FROM clock_timestamp() - :'t1'::timestamptz)::numeric * 1000, 1) AS ms_versions \gset
 COMMIT;
-SELECT tuple_count AS live, dead_tuple_count AS dead FROM pgstattuple('drv_centroid') \gset
-VACUUM drv_centroid;
+SELECT tuple_count AS live, dead_tuple_count AS dead FROM pgstattuple('drv_summed_centroid') \gset
+VACUUM drv_summed_centroid;
 SELECT clock_timestamp() AS t2 \gset
 $JOIN \g /dev/null
 SELECT round(extract(epoch FROM clock_timestamp() - :'t2'::timestamptz)::numeric * 1000, 1) AS ms_vacuum \gset

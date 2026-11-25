@@ -49,10 +49,13 @@ def no_index(tbls, drv):
 
 def mean(tbls, drv):
     # Running-mean centroids instead of summed ones: the cluster table stores the norm
-    # of the mean; adding a document rewrites every entry of the centroid; no final
-    # division.
-    tbls = sub(tbls, "            norm float NOT NULL DEFAULT 0.0,\n            sum_sq_norm float NOT NULL DEFAULT 0.0\n",
+    # of the mean instead of the squared norm of the sum, the centroid table holds means
+    # (so it is named <output_tbl>_centroid), and adding a document rewrites every entry
+    # of the centroid.
+    tbls = sub(tbls, "            sum_sq_norm float NOT NULL DEFAULT 0.0\n",
                      "            norm float NOT NULL DEFAULT 0.0\n")
+    drv = sub(drv, "centroid_tbl text := output_tbl || '_summed_centroid';",
+                   "centroid_tbl text := output_tbl || '_centroid';")
     drv = sub(drv, "c.prod / NULLIF(a_norm.norm * SQRT(r.sum_sq_norm), 0.0)", "c.prod / NULLIF(a_norm.norm * r.norm, 0.0)")
     old_add = cut(drv, "    -- Add the document with id $2 to cluster $1, in one statement:", "    );\n")
     drv = sub(drv, old_add, """    -- Add the document with id $2 to cluster $1, in one statement (mean centroids):
@@ -103,8 +106,6 @@ def mean(tbls, drv):
         output_tbl
     );
 """)
-    drv = sub(drv, cut(drv, "    -- Turn the summed centroids into mean centroids, and their norms accordingly.",
-                       "DROP COLUMN sum_sq_norm', output_tbl);\n"), "")
     return tbls, drv
 
 

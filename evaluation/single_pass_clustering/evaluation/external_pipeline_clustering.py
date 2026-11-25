@@ -9,7 +9,7 @@ steps:
   export   SELECT doc_id FROM <docs> ORDER BY <ts>, doc_id, and
            SELECT doc_id, term, weight FROM <tfidf>                 (two queries)
   cluster  single-pass clustering in pure Python, in memory (below)
-  import   create <out>, <out>_centroid, <out>_cluster_assignments with
+  import   create <out>, <out>_summed_centroid, <out>_cluster_assignments with
            hsql_create_tbls_for_single_pass_clustering (the driver's schema, keys,
            and indexes) and COPY the clusters, centroids, and assignments into them;
            one transaction, logged tables, as the driver's
@@ -28,8 +28,7 @@ to the same cluster (run_comparison_python.py checks this):
   - adding a document adds its positive weights to the centroid sums and updates
     sum_sq_norm by sum(w * (2 * old + w)) over those terms (Equation 3 of the paper),
     as the driver does, instead of recomputing the norm;
-  - at the end, the centroid weights are divided by the cluster size, and
-    norm = sqrt(sum_sq_norm) / size.
+  - the centroids are written as sums, with sum_sq_norm, as the driver leaves them.
 
   python3 external_pipeline_clustering.py --threshold 0.4 [--docs sp_docs]
       [--ts ts] [--tfidf sp_tfidf] [--out dpy] [--timeout 1800]
@@ -154,12 +153,11 @@ def import_clusters(conn, out_tbl, assignments, centroids, sum_sq, sizes):
     with conn.cursor() as cur:
         cur.execute("SET client_min_messages = warning")
         cur.execute("SELECT hsql_create_tbls_for_single_pass_clustering(%s, %s, %s, TRUE)",
-                    (out_tbl, out_tbl + "_centroid", out_tbl + "_cluster_assignments"))
-        cur.execute(f'ALTER TABLE "{out_tbl}" DROP COLUMN sum_sq_norm')
-        copy(cur, out_tbl, "cid, doc_count, norm",
-             (f"{i + 1}\t{n}\t{math.sqrt(s) / n!r}\n" for i, (n, s) in enumerate(zip(sizes, sum_sq))))
-        copy(cur, out_tbl + "_centroid", "cid, term, weight",
-             (f"{i + 1}\t{term}\t{(w / n if n > 1 else w)!r}\n"
+                    (out_tbl, out_tbl + "_summed_centroid", out_tbl + "_cluster_assignments"))
+        copy(cur, out_tbl, "cid, doc_count, sum_sq_norm",
+             (f"{i + 1}\t{n}\t{s!r}\n" for i, (n, s) in enumerate(zip(sizes, sum_sq))))
+        copy(cur, out_tbl + "_summed_centroid", "cid, term, weight",
+             (f"{i + 1}\t{term}\t{w!r}\n"
               for i, (c, n) in enumerate(zip(centroids, sizes)) for term, w in c.items()))
         copy(cur, out_tbl + "_cluster_assignments", "doc_id, cid",
              (f"{d}\t{c}\n" for d, c in assignments.items()))

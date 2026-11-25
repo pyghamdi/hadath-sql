@@ -212,7 +212,7 @@ BEGIN
                     p_max_rows, p_step_rows;
             END IF;
 
-            v_centroid_tbl := v_output_tbl || '_centroid';
+            v_centroid_tbl := v_output_tbl || '_summed_centroid';
             v_assignments_tbl := v_output_tbl || '_cluster_assignments';
             v_tfidf_tbl := v_output_tbl || '_tfidf';
 

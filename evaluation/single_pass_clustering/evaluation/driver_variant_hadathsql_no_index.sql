@@ -28,20 +28,19 @@ BEGIN
         EXECUTE format('DROP TABLE IF EXISTS %I, %I, %I CASCADE', output_tbl, centroid_tbl, assignments_tbl);
     END IF;
 
-    -- Cluster registry: one row per cluster, with a running document count, the
-    -- squared norm of the summed centroid (kept up to date during clustering), and
-    -- the norm of the mean centroid (set at the end).
+    -- Cluster registry: one row per cluster, with a running document count and the
+    -- squared norm of the summed centroid (kept up to date during clustering).
     EXECUTE format(
         'CREATE TABLE IF NOT EXISTS %I (
             cid SERIAL PRIMARY KEY,
             doc_count integer NOT NULL DEFAULT 0,
-            norm float NOT NULL DEFAULT 0.0,
             sum_sq_norm float NOT NULL DEFAULT 0.0
         )',
         output_tbl
     );
 
-    -- Centroid table: long-format (cid, term, weight); one row per term per cluster.
+    -- Centroid table: long-format (cid, term, weight); one row per term per cluster;
+    -- weight is the sum of the term's weights over the documents of the cluster.
     EXECUTE format(
         'CREATE TABLE IF NOT EXISTS %I (
             cid integer NOT NULL REFERENCES %I(cid) ON DELETE CASCADE,
@@ -86,7 +85,7 @@ DECLARE
                                     -- assignment) in one statement.
 
     -- Derived table names.
-    centroid_tbl text := output_tbl || '_centroid';
+    centroid_tbl text := output_tbl || '_summed_centroid';
     assignments_tbl text := output_tbl || '_cluster_assignments';
 
     -- Loop state.
@@ -271,17 +270,6 @@ BEGIN
             next_analyze := next_analyze * 2;
         END IF;
     END LOOP;
-
-    -- Turn the summed centroids into mean centroids, and their norms accordingly.
-    EXECUTE format(
-        'UPDATE %I c SET weight = c.weight / r.doc_count FROM %I r
-         WHERE r.cid = c.cid AND r.doc_count > 1',     -- a sum over one document is its mean
-        centroid_tbl, output_tbl
-    );
-    EXECUTE format(
-        'UPDATE %I SET norm = SQRT(sum_sq_norm) / doc_count', output_tbl
-    );
-    EXECUTE format('ALTER TABLE %I DROP COLUMN sum_sq_norm', output_tbl);
 
     -- Release the prepared statements.
     FOR stmt_name IN

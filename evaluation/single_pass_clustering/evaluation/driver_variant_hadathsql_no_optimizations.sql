@@ -28,9 +28,8 @@ BEGIN
         EXECUTE format('DROP TABLE IF EXISTS %I, %I, %I CASCADE', output_tbl, centroid_tbl, assignments_tbl);
     END IF;
 
-    -- Cluster registry: one row per cluster, with a running document count, the
-    -- squared norm of the summed centroid (kept up to date during clustering), and
-    -- the norm of the mean centroid (set at the end).
+    -- Cluster registry: one row per cluster, with a running document count and the
+    -- squared norm of the summed centroid (kept up to date during clustering).
     EXECUTE format(
         'CREATE TABLE IF NOT EXISTS %I (
             cid SERIAL PRIMARY KEY,
@@ -40,7 +39,8 @@ BEGIN
         output_tbl
     );
 
-    -- Centroid table: long-format (cid, term, weight); one row per term per cluster.
+    -- Centroid table: long-format (cid, term, weight); one row per term per cluster;
+    -- weight is the sum of the term's weights over the documents of the cluster.
     EXECUTE format(
         'CREATE TABLE IF NOT EXISTS %I (
             cid integer NOT NULL REFERENCES %I(cid) ON DELETE CASCADE,
@@ -262,7 +262,6 @@ BEGIN
             next_analyze := next_analyze * 2;
         END IF;
     END LOOP;
-
 
 
     EXECUTE format('SELECT COUNT(*) FROM %I', output_tbl) INTO final_cluster_count;
