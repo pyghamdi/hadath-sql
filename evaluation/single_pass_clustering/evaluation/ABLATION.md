@@ -2,7 +2,7 @@
 
 This file covers the ablation: the HadathSQL driver against variants of it that each
 lack one optimization, to be run on the remote server. The comparison of HadathSQL
-with other solutions (the Standard SQL CTE, an external pipeline) is a separate
+with standard SQL (the Standard SQL CTE) is a separate
 evaluation, in `COMPARISON.md`; both use the datasets and the server setup described
 here. The runs made on the laptop while the drivers were developed are recorded
 under *Preliminary runs*.

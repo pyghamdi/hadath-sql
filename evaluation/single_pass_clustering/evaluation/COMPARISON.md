@@ -1,7 +1,9 @@
-# Single-pass clustering, evaluation 2: HadathSQL against other solutions
+# Single-pass clustering, evaluation 2: HadathSQL against standard SQL
 
-This file covers the comparison of the HadathSQL driver with other ways to run the
-same single-pass clustering: the Standard SQL CTE and an external pipeline. It is
+This file covers the comparison of the HadathSQL driver with the same single-pass
+clustering written in standard SQL only, as a recursive CTE, and of HadathSQL's TF-IDF
+stage with the same computation in standard SQL. HadathSQL is compared only with
+standard SQL, not with applications that run outside the database. It is
 separate from the ablation of the HadathSQL driver (`ABLATION.md`), which describes
 the datasets and the server setup used here as well.
 
@@ -9,8 +11,7 @@ the datasets and the server setup used here as well.
 |---|---|
 | HadathSQL driver (`single_pass_clustering/sp_clustering.sql`; key `driver`) | ready |
 | Standard SQL CTE (`prep_cte_standard.sql`, `run_cte_standard.sql`; key `cte-standard`) | ready (`comparison_cte.conf`) |
-| External pipeline, TF-IDF stage (`tfidf_python.py`, scikit-learn `TfidfVectorizer`) | ready (`run_tfidf_comparison.py`) |
-| External pipeline, clustering stage (`external_pipeline_clustering.py`) | ready (`run_comparison_python.py`) |
+| TF-IDF stage in standard SQL (`tfidf_standard.sql`) | ready (`run_tfidf_standard.py`) |
 
 ## Standard SQL CTE
 
@@ -49,7 +50,7 @@ are identical; `run_tfidf_standard.py` checks this at every size (`mismatches`,
 
 - Both methods create a regular (logged) table, since standard SQL has no UNLOGGED
   tables; PostgreSQL's default configuration (up to 2 parallel workers).
-- Sizes as in the TF-IDF comparison; median of up to 3 runs (one run when a run
+- Sizes: Synthetic-Tweets 125 to 1,024,000, Synthetic-News 125 to 256,000 (doubling); median of up to 3 runs (one run when a run
   takes 60 s or more); 15-minute limit per run (`--timeout 900`).
 - Run: `python3 run_tfidf_standard.py --timeout 900` (or, without a Python
   environment, `uv run --no-project --with psycopg2-binary python run_tfidf_standard.py --timeout 900`).
@@ -57,81 +58,6 @@ are identical; `run_tfidf_standard.py` checks this at every size (`mismatches`,
 Results: `results_tfidf_standard_synthetic_*.csv` (server, to be run). A laptop run
 (2026-11-23) is kept as `results_tfidf_standard_laptop_synthetic_*.csv`; it is
 preliminary and is to be redone on the server.
-
-## External pipeline
-
-A Python program that reads the documents from PostgreSQL, computes TF-IDF and the
-clusters, and writes them back. Its time includes the export and the import.
-
-### TF-IDF stage (`run_tfidf_comparison.py`)
-
-HadathSQL's `hsql_create_tf_idf_tbl` against `tfidf_python.py`: export
-(`SELECT doc_id, txt`), preprocessing (`tokenizer_python.py`, the same terms as
-`to_tsvector('english', ...)`; checked by `check_tokenizer.py`), scikit-learn
-`TfidfVectorizer` with its defaults (single-threaded; its weights differ from
-HadathSQL's, the (doc_id, term) pairs are the same), and import with `COPY`.
-
-- Both weights tables are UNLOGGED (no write-ahead log): the times measure computing
-  the weights, not logging the rows written. UNLOGGED is the default of
-  `hsql_create_tf_idf_tbl`.
-- Parallel workers: by default PostgreSQL keeps its configuration (up to 2 workers per
-  query, started by the planner from the size of the table's main storage).
-  `--workers n` sets `max_parallel_workers_per_gather` and `max_parallel_workers` for
-  the session and the `parallel_workers` parameter of `sp_docs`; for n > 8 the server
-  needs `max_worker_processes` >= n in `postgresql.conf` (restart needed), and the
-  script stops otherwise. Workers actually started are recorded per size
-  (`sql_workers_launched`).
-- `work_mem` is set per size to the peak memory of the Python process at that size
-  (`py_peak_mb`; Python runs first), unless `--work-mem` fixes it.
-- Sizes: Synthetic-Tweets 125 to 1,024,000, Synthetic-News 125 to 256,000 (doubling);
-  median of up to 3 runs (1 run when a run takes 60 s or more); 30-minute limit per run
-  (`--timeout 0`: none).
-- Requires `pip install psycopg2-binary PyStemmer scikit-learn`; the figure:
-  `plot_tfidf.py` (matplotlib, LaTeX).
-- `--worker-sweep` (0, 1, 2, 4, and physical cores - 1 workers at the largest sizes)
-  exists but was not run.
-
-Server runs (2026-11-09; machine and settings in `machine_tfidf.txt`):
-
-1. All cores: `python3 run_tfidf_comparison.py --workers 9` (sizes up to 256,000 tweets
-   and 64,000 news documents, before the larger sizes were added); results renamed to
-   `results_tfidf_w9_<setting>.csv`, log `sweep_tfidf_w9.log` (not tracked).
-2. Default workers: `python3 run_tfidf_comparison.py`, then the largest news size again
-   without a time limit (`--settings synthetic_news --sizes 256000 --timeout 0`);
-   results `results_tfidf_<setting>.csv`, log `sweep_tfidf_default.log` (not tracked).
-
-Results (default workers): HadathSQL leads by 0.96-1.3x on tweets and 1.15-1.4x on news
-while the planner starts no workers (tweets up to 64,000, news up to 8,000); with the 2
-default workers, about 1.55x on tweets up to 1,024,000 documents and 2.2x to 3.9x on
-news up to 256,000. Nine workers take the same time as two wherever two start.
-
-Prototype not adopted: removing the aggregation and join on doc_id from the TF-IDF query
-(`proto_tfidf_total.sql`, `proto_tfidf_total.py`, `proto_tfidf_total_results.txt`).
-
-### Clustering stage
-
-`external_pipeline_clustering.py` reads HadathSQL's weights table (`sp_tfidf`) and the
-document order (`sp_docs` by `ts`), clusters in pure Python with the driver's rules
-(candidates through a term -> clusters dictionary plus the newest cluster, cosine with
-the summed centroid, ties to the newest cluster, `>=` threshold, summed centroids with
-the incremental squared norm), and writes the clusters into tables with the driver's
-schema (`hsql_create_tbls_for_single_pass_clustering`, then `COPY`). Since both start
-from the same weights, the clusters must be the same; `run_comparison_python.py` checks
-this at every point (`mismatches`).
-
-`run_comparison_python.py` times it against `hsql_single_pass_clustering_tfidf` on the
-sizes and thresholds of the ablation (Synthetic-Tweets 125 to 64,000, Synthetic-News 125
-to 16,000; thresholds 0 to 1 by 0.2), with the ablation's repetitions, 30-minute limit,
-and dropout rule; the TF-IDF table is built once per size and not timed. Results:
-`results_comparison_python_<setting>.csv` (server, to be run), with the time of each
-step of the pipeline (export, clustering, import) and its peak memory.
-
-  python3 run_comparison_python.py
-  uv run --no-project --with psycopg2-binary python run_comparison_python.py
-
-Laptop check (2026-11-24, single runs, not results): 0 mismatches at every point tried;
-the pipeline was faster than the driver, e.g. 1.6 s against 16.6 s at 16,000 tweets
-(threshold 0.2) and 18.9 s against 70.4 s at 4,000 news documents (threshold 0.2).
 
 ## How to run (remote server)
 
