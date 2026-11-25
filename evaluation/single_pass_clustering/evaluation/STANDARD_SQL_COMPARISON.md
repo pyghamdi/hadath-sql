@@ -23,8 +23,9 @@ or more at 200 synthetic news documents), so it runs separately on smaller data
 comparison and the correctness reference.
 
 - Datasets (`ABLATION.md`, *Datasets*) and thresholds as in the ablation.
-- Documents: Synthetic-Tweets 100, 200, 400, 800, 1,600, 3,200; Synthetic-News 25, 50,
-  100, 200, 400.
+- Documents: Synthetic-Tweets 100, 200, 400, 800, 1,600, 3,200, 6,400; Synthetic-News
+  25, 50, 100, 200, 400, 800. The CTE's time and temporary files grow quadratically
+  (it stores every intermediate state), so it cannot run at the ablation's sizes.
 - CTE time: the wall-clock time of one `psql` session that runs its input preparation
   (`prep_cte_standard.sql`: numbering of the documents in timestamp order with its
   primary key, one row per (document, term) with its index, `ANALYZE`) and then the
