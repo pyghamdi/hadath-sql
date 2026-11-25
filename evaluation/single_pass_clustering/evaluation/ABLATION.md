@@ -140,19 +140,25 @@ Requirements: PostgreSQL with `psql` and `pg_isready`, bash, python3, perl, and 
 2. Create an empty database and set `PGHOST`, `PGPORT`, `PGUSER`, `PGDATABASE` (the
    defaults are those of the laptop's test instance: localhost, 54329, test, hadath),
    and `PSQL`/`PG_ISREADY` if the client tools are not on the `PATH`.
-3. `bash setup_db.sh`: generates the ablation variants, installs HadathSQL, the CTE
-   helpers, and all driver variants, and writes the machine and server configuration
+3. `bash setup_db.sh`: generates the ablation variants, installs HadathSQL and all
+   driver variants, and writes the machine and server configuration
    to `machine.txt` (for the setup section of the paper).
 4. `nohup bash sweep.sh > sweep_ablation.log 2>&1 &` runs the ablation (`ablation.conf`,
    the default config). Do not run another sweep (e.g. the comparison of
    `STANDARD_SQL_COMPARISON.md`) at the same time: sweeps use the same tables and would also distort
    each other's times.
 5. A sweep resumes where it stopped when rerun with the same command (points already in
-   the CSV files are skipped). It checks the server before every point; if the server
+   the CSV files are skipped). Next to each CSV file, `<file>.version` holds a
+   fingerprint of the code that defines a measurement (the HadathSQL driver, its
+   variants, the Standard SQL CTE, the TF-IDF stage, the data generator, and
+   `run_point.sh`); if that code changed since the file was written, or the file has no
+   fingerprint, the sweep starts the file over, so results of earlier code are
+   overwritten rather than mixed with new ones. It checks the server before every point; if the server
    is down, or went down during a point (whose result is then discarded), it stops with
    exit code 2. Any setting of a config can be overridden from the environment
    (`METHODS`, `PREFIX`, `TIMEOUT`, ...).
-6. Copy back `results_ablation_*.csv`, `machine.txt`, and the log, and run
+6. Copy back `results_ablation_*.csv` with their `.version` files, `machine.txt`, and
+   the log, and run
    `python3 render_results.py` to update the results tables here.
 
 ### The server (set up 2026-10-22)

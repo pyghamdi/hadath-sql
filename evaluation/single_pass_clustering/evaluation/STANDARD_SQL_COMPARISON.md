@@ -83,8 +83,9 @@ not for performance comparison: their times are not part of the evaluation.
 1. Set up the server and the database as in `ABLATION.md` (*How to run*, steps 1–3).
 2. After the ablation has finished (never at the same time as another sweep),
    `nohup bash sweep.sh comparison_cte.conf > sweep_comparison_cte.log 2>&1 &`.
-3. Resuming and the server check work as for the ablation.
-4. Copy back `results_comparison_cte_*.csv` and the log, and run
+3. Resuming, starting over when the code changed (`.version` files), and the server
+   check work as for the ablation.
+4. Copy back `results_comparison_cte_*.csv` with their `.version` files and the log, and run
    `python3 render_results.py` to update the results tables here.
 
 The preliminary light run on the laptop also timed the Standard SQL CTE at 200 to

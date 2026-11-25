@@ -4,7 +4,8 @@
 # Within each (setting, threshold) series, a method that hits the time limit is not
 # run at larger sizes; a point during which the machine slept is measured again (up to
 # twice); a sweep that is interrupted resumes where it stopped (points already in the
-# CSV file are skipped). The results sections of ABLATION.md and STANDARD_SQL_COMPARISON.md are
+# CSV file are skipped), unless the code that defines a measurement changed since the
+# file was written: then the file is started over (see FINGERPRINT below). The results sections of ABLATION.md and STANDARD_SQL_COMPARISON.md are
 # regenerated after
 # every point.
 #
@@ -52,9 +53,25 @@ server_down_exit() {
   exit 2
 }
 
+# Fingerprint of the code that defines a measurement: the HadathSQL driver, its
+# ablation variants, the Standard SQL CTE, the TF-IDF stage, the data generator, and the
+# runner. It is stored next to each results file (<file>.version). A results file whose
+# fingerprint differs (or is missing) was measured with other code, so it is started
+# over instead of resumed: its points are overwritten, never mixed with new ones.
+REPO=$(cd ../../.. && pwd)
+FINGERPRINT=$(cat "$REPO/single_pass_clustering/sp_clustering.sql" "$REPO/tf_idf/tf_idf.sql" \
+                  driver_variant_hadathsql_*.sql prep_cte_standard.sql run_cte_standard.sql \
+                  gen_synthetic_data.sql run_point.sh | cksum | cut -d' ' -f1)
+
 echo "sweep: methods=$METHODS settings=$SETTINGS thresholds=$THRESHOLDS timeout=${TIMEOUT}s reps=$REPS prefix=$PREFIX"
 for SETTING in $SETTINGS; do
   OUT=$PREFIX$SETTING.csv
+  VERSION=${OUT%.csv}.version
+  if [ -f "$OUT" ] && [ "$(cat "$VERSION" 2>/dev/null)" != "$FINGERPRINT" ]; then
+    echo "$OUT was measured with other code (driver, variants, CTE, or runner); starting it over."
+    rm -f "$OUT"
+  fi
+  echo "$FINGERPRINT" > "$VERSION"
   [ -f "$OUT" ] || echo "$HDR" > "$OUT"
   # A results file written with other columns cannot take lines in the current format.
   if [ "$(head -1 "$OUT")" != "$HDR" ]; then
