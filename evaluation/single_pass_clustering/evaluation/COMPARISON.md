@@ -59,6 +59,19 @@ Results: `results_tfidf_standard_synthetic_*.csv` (server, to be run). A laptop 
 (2026-11-23) is kept as `results_tfidf_standard_laptop_synthetic_*.csv`; it is
 preliminary and is to be redone on the server.
 
+## Python scripts: correctness checks only
+
+The Python scripts in this folder are kept to check the correctness of the results,
+not for performance comparison: their times are not part of the evaluation.
+
+- `external_pipeline_clustering.py`, run by `run_comparison_python.py`: clusters the
+  documents of HadathSQL's weights table with the driver's rules in Python and checks
+  that every document is assigned to the same cluster as by the driver (`mismatches`).
+- `tfidf_python.py`, run by `run_tfidf_comparison.py`: computes TF-IDF with
+  scikit-learn and checks that it yields the same (doc_id, term) pairs as HadathSQL.
+- `tokenizer_python.py`, checked by `check_tokenizer.py`: preprocesses text as
+  `to_tsvector('english', ...)` does, so that the checks above start from the same terms.
+
 ## How to run (remote server)
 
 1. Set up the server and the database as in `ABLATION.md` (*How to run*, steps 1–3).
